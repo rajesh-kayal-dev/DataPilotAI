@@ -6,6 +6,8 @@ import documentRoutes from './routes/documentRoutes.js';
 import streamRoutes from './routes/streamRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import googleRoutes from './routes/googleAuthRoutes.js';
+import workspaceRoutes from './routes/workspaceRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
 
 const app = express();
 
@@ -25,6 +27,8 @@ app.use(express.json());
 
 
 app.use('/api/documents', documentRoutes);
+app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/chats', chatRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api', googleRoutes);

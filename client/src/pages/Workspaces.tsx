@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../components/Logo';
+import axiosInstance from '../utils/axiosInstance';
 
-const WorkshopSetup: React.FC = () => {
+const Workspaces: React.FC = () => {
   const [step, setStep] = useState(1);
-  const [workshopName, setWorkshopName] = useState('');
+  const [WorkspacesName, setWorkspacesName] = useState('');
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const navigate = useNavigate();
 
   const totalSteps = 5;
 
-  const handleNext = () => {
-    if (step < totalSteps) {
+  const handleNext = async () => {
+    if (step === 1) {
+      if (!WorkspacesName.trim()) return alert('Please enter a workspace name');
+      try {
+        const res = await axiosInstance.post('/api/workspaces', { name: WorkspacesName });
+        setWorkspaceId(res.data._id);
+        setStep(2);
+      } catch (err) {
+        alert('Failed to create workspace');
+      }
+    } else if (step < totalSteps) {
       if (step === 3) {
         simulateProcessing();
       } else {
@@ -36,8 +47,30 @@ const WorkshopSetup: React.FC = () => {
     }, 50);
   };
 
+  const handleFileUpload = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('document', file);
+    if (workspaceId) formData.append('workspaceId', workspaceId);
+
+    const res = await axiosInstance.post('/api/documents/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    const documentId = res.data.documentId;
+
+    navigate(`/processing/${documentId}`);
+
+  } catch (error) {
+    console.error(error);
+    alert('Upload failed');
+  }
+};
+
   const applyChip = (name: string) => {
-    setWorkshopName(name);
+    setWorkspacesName(name);
   };
 
   const renderStepContent = () => {
@@ -49,14 +82,14 @@ const WorkshopSetup: React.FC = () => {
               <div className="step-meta mb-7">
                 <div className="step-pill">Step 1 of 5</div>
               </div>
-              <h2 className="font-display font-bold text-2xl text-white mb-2">Name your workshop</h2>
+              <h2 className="font-display font-bold text-2xl text-white mb-2">Name your Workspaces</h2>
               <p className="text-[#6B5F80] text-sm mb-8">Pick something that represents this collection of documents.</p>
 
               <input
                 type="text"
-                value={workshopName}
-                onChange={(e) => setWorkshopName(e.target.value)}
-                placeholder="My Workshop"
+                value={WorkspacesName}
+                onChange={(e) => setWorkspacesName(e.target.value)}
+                placeholder="My Workspaces"
                 maxLength={48}
                 className="w-full bg-transparent border-b border-[#352B44] py-3 text-2xl font-display font-semibold text-white outline-none focus:border-[#7C4FD4] transition-colors placeholder-[#352B44]"
               />
@@ -95,13 +128,22 @@ const WorkshopSetup: React.FC = () => {
               <h2 className="font-display font-bold text-2xl text-white mb-2">Add your documents</h2>
               <p className="text-[#6B5F80] text-sm mb-6">Drop any PDFs, Word docs, or text files. You can always add more later.</p>
 
-              <div className="drop-zone border border-dashed border-[#352B44] rounded-2xl p-10 text-center cursor-pointer hover:border-[rgba(124,79,212,0.55)] hover:bg-[rgba(124,79,212,0.05)] transition-all bg-black/15">
+              <label className="drop-zone border border-dashed border-[#352B44] rounded-2xl p-10 text-center cursor-pointer hover:border-[rgba(124,79,212,0.55)] hover:bg-[rgba(124,79,212,0.05)] transition-all bg-black/15 block relative">
+                <input 
+                  type="file" 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileUpload(e.target.files[0]);
+                    }
+                  }} 
+                />
                 <div className="w-13 h-13 rounded-xl mx-auto mb-3 bg-[rgba(124,79,212,0.1)] border border-[rgba(124,79,212,0.2)] flex items-center justify-center">
                   <svg className="w-6 h-6 text-[#9B6FCC]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
                 </div>
                 <div className="text-[#6B5F80] text-sm mb-1 font-medium">Drop files here</div>
                 <div className="text-[#352B44] text-xs">PDF, DOCX, TXT - up to 50MB</div>
-              </div>
+              </label>
             </div>
           </div>
         );
@@ -124,9 +166,8 @@ const WorkshopSetup: React.FC = () => {
                 ].map((m) => (
                   <div
                     key={m.mode}
-                    className={`flex items-center gap-4 p-4 rounded-xl bg-white/5 border cursor-pointer transition-all ${
-                      m.selected ? 'border-[rgba(124,79,212,0.6)] bg-[rgba(124,79,212,0.1)] shadow-[0_0_0_1px_rgba(124,79,212,0.15),0_8px_24px_rgba(124,79,212,0.12)]' : 'border-[rgba(124,79,212,0.13)] hover:border-[rgba(124,79,212,0.4)]'
-                    }`}
+                    className={`flex items-center gap-4 p-4 rounded-xl bg-white/5 border cursor-pointer transition-all ${m.selected ? 'border-[rgba(124,79,212,0.6)] bg-[rgba(124,79,212,0.1)] shadow-[0_0_0_1px_rgba(124,79,212,0.15),0_8px_24px_rgba(124,79,212,0.12)]' : 'border-[rgba(124,79,212,0.13)] hover:border-[rgba(124,79,212,0.4)]'
+                      }`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${m.selected ? 'bg-[rgba(124,79,212,0.2)] border border-[rgba(124,79,212,0.4)]' : 'bg-white/5 border border-[rgba(124,79,212,0.13)]'}`}>
                       {m.mode === 'fast' ? '' : m.mode === 'balanced' ? '' : ''}
@@ -135,9 +176,8 @@ const WorkshopSetup: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-display font-bold text-white">{m.name}</span>
                         {m.tag && (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-body uppercase tracking-wider ${
-                            m.tag === 'Recommended' ? 'bg-[rgba(251,191,36,0.12)] border border-[rgba(251,191,36,0.25)] text-[#FBBF24]' : 'bg-[rgba(124,79,212,0.15)] border border-[rgba(124,79,212,0.3)] text-[#C084FC]'
-                          }`}>{m.tag}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-body uppercase tracking-wider ${m.tag === 'Recommended' ? 'bg-[rgba(251,191,36,0.12)] border border-[rgba(251,191,36,0.25)] text-[#FBBF24]' : 'bg-[rgba(124,79,212,0.15)] border border-[rgba(124,79,212,0.3)] text-[#C084FC]'
+                            }`}>{m.tag}</span>
                         )}
                       </div>
                       <div className="text-xs text-[#6B5F80]">{m.desc}</div>
@@ -159,7 +199,7 @@ const WorkshopSetup: React.FC = () => {
               <div className="step-meta mb-7">
                 <div className="step-pill">Step 4 of 5</div>
               </div>
-              <h2 className="font-display font-bold text-2xl text-white mb-2">Building your workshop...</h2>
+              <h2 className="font-display font-bold text-2xl text-white mb-2">Building your Workspaces...</h2>
               <p className="text-[#6B5F80] text-sm mb-8">Sit tight - your documents are being indexed.</p>
 
               <div className="space-y-4">
@@ -204,7 +244,7 @@ const WorkshopSetup: React.FC = () => {
               </div>
 
               <div className="inline-flex items-center gap-1.5 bg-[rgba(52,211,153,0.1)] border border-[rgba(52,211,153,0.25)] rounded-full px-3.5 py-1 mb-4">
-                <span className="text-[11px] text-[#34D399] font-semibold tracking-wider uppercase">Workshop Ready</span>
+                <span className="text-[11px] text-[#34D399] font-semibold tracking-wider uppercase">Workspaces Ready</span>
               </div>
 
               <h2 className="font-display font-extrabold text-3xl text-white mb-3 tracking-tight">Your workspace is live</h2>
@@ -214,7 +254,7 @@ const WorkshopSetup: React.FC = () => {
 
               <div className="flex justify-center gap-3 mb-8">
                 <div className="px-4 py-2 rounded-full bg-white/5 border border-[rgba(124,79,212,0.13)] text-sm text-[#6B5F80]">
-                  <span className="text-white font-semibold">{workshopName || 'Workshop'}</span> created
+                  <span className="text-white font-semibold">{WorkspacesName || 'Workspaces'}</span> created
                 </div>
                 <div className="px-4 py-2 rounded-full bg-white/5 border border-[rgba(124,79,212,0.13)] text-sm text-[#6B5F80]">
                   Documents <span className="text-white font-semibold">indexed</span>
@@ -265,7 +305,7 @@ const WorkshopSetup: React.FC = () => {
       <main className="flex-1 flex flex-col items-center px-5 pt-12 pb-20">
         <div className="text-center mb-12">
           <h1 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight mb-2">
-            Setup Your <span className="text-gradient">Workshop</span>
+            Setup Your <span className="text-gradient">Workspaces</span>
           </h1>
           <p className="text-[#6B5F80] text-sm">A guided space for your AI-powered document intelligence</p>
         </div>
@@ -279,17 +319,15 @@ const WorkshopSetup: React.FC = () => {
             ></div>
             {[1, 2, 3, 4, 5].map((s) => (
               <div key={s} className="relative z-10 flex flex-col items-center flex-1">
-                <div className={`w-3.5 h-3.5 rounded-full border transition-all duration-300 ${
-                  s < step ? 'border-[#7C4FD4] bg-gradient-to-br from-[#7C4FD4] to-[#4F8EF7] shadow-[0_0_10px_rgba(124,79,212,0.4)]' :
+                <div className={`w-3.5 h-3.5 rounded-full border transition-all duration-300 ${s < step ? 'border-[#7C4FD4] bg-gradient-to-br from-[#7C4FD4] to-[#4F8EF7] shadow-[0_0_10px_rgba(124,79,212,0.4)]' :
                   s === step ? 'border-[#7C4FD4] bg-[#7C4FD4] shadow-[0_0_0_4px_rgba(124,79,212,0.18),0_0_14px_rgba(124,79,212,0.5)] scale-125' :
-                  'border-[#352B44] bg-[#08060E]'
-                }`}>
+                    'border-[#352B44] bg-[#08060E]'
+                  }`}>
                   {s < step && <div className="w-1 h-1 rounded-full bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>}
                   {s === step && <div className="w-1 h-1 rounded-full bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>}
                 </div>
-                <span className={`text-[11px] mt-2.5 transition-colors ${
-                  s === step ? 'text-[#C084FC] font-semibold' : s < step ? 'text-[#6B5F80]' : 'text-[#352B44]'
-                }`}>
+                <span className={`text-[11px] mt-2.5 transition-colors ${s === step ? 'text-[#C084FC] font-semibold' : s < step ? 'text-[#6B5F80]' : 'text-[#352B44]'
+                  }`}>
                   {s === 1 ? 'Info' : s === 2 ? 'Upload' : s === 3 ? 'Mode' : s === 4 ? 'Processing' : 'Ready'}
                 </span>
               </div>
@@ -328,4 +366,4 @@ const WorkshopSetup: React.FC = () => {
   );
 };
 
-export default WorkshopSetup;
+export default Workspaces;

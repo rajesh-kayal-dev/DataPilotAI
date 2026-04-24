@@ -64,7 +64,7 @@ DataPilotAI is an AI-powered SaaS platform that lets teams upload internal docum
 - Redis caching for repeated queries
 - Sidebar with past chats, click to restore
 
-### 2.7 Workspace Structure
+### 2.7 Workspaces Structure
 - Each user has an isolated workspace
 - Upload docs, manage chats, all scoped to workspace context
 - Scalable for future team/organization-level workspaces

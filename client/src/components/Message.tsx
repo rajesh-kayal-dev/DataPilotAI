@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 interface MessageProps {
   role: 'user' | 'assistant';
@@ -58,7 +59,9 @@ const Message: React.FC<MessageProps> = ({ role, content, source }) => {
               <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
             </div>
           ) : (
-            <p className="text-sm leading-relaxed">{displayedText}</p>
+            <div className="text-sm leading-relaxed markdown-content">
+              <ReactMarkdown>{displayedText}</ReactMarkdown>
+            </div>
           )}
         </div>
 

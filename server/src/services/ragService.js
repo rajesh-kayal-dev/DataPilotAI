@@ -1,32 +1,82 @@
 import { generateEmbedding } from '../utils/embedding.js';
-import Document from '../models/Document.js';
 
-export const chunkAndEmbed = (text) => {
-  // Simple chunking: Split by paragraphs (improve later)
-  const chunks = text.split('\n\n').filter(chunk => chunk.trim().length > 0);
+export const chunkText = (text) => {
+  const paragraphs = text.split(/\n\n/);
+  const chunks = [];
+  let currentChunk = "";
+  const targetSize = 800;
+  const overlapSize = 120;
 
-  return chunks.map(chunk => ({
-    content: chunk,
-    embedding: generateEmbedding(chunk),
-  }));
+  paragraphs.forEach((para) => {
+    // Basic validation: if a single paragraph is too large, split it further
+    if (para.length > targetSize) {
+      const subChunks = para.match(new RegExp(`.{1,${targetSize}}`, 'g')) || [];
+      subChunks.forEach(sc => {
+        if (sc.length > 1000) sc = sc.slice(0, 1000); // Hard trim
+        chunks.push(sc);
+      });
+      return;
+    }
+
+    if ((currentChunk.length + para.length) < targetSize) {
+      currentChunk += (currentChunk ? "\n\n" : "") + para;
+    } else {
+      if (currentChunk) {
+        let finalChunk = currentChunk;
+        if (finalChunk.length > 1000) finalChunk = finalChunk.slice(0, 1000); // Validation
+        chunks.push(finalChunk);
+      }
+      
+      const overlap = currentChunk.slice(-overlapSize);
+      currentChunk = overlap + "\n\n" + para;
+    }
+  });
+
+  if (currentChunk) {
+    let finalChunk = currentChunk;
+    if (finalChunk.length > 1000) finalChunk = finalChunk.slice(0, 1000);
+    chunks.push(finalChunk);
+  }
+
+  const avgSize = chunks.reduce((acc, c) => acc + c.length, 0) / chunks.length;
+  console.log(`Chunking Results: Total Chunks: ${chunks.length}, Avg Size: ${Math.round(avgSize)} chars`);
+  return chunks;
 };
 
-// Mock function to find similar embeddings (replace with real vector search)
-const findSimilarChunks = async (queryEmbedding) => {
-  // In a real app, use a vector DB (e.g., Pinecone, Weaviate) or MongoDB's $vectorSearch
-  const documents = await Document.find({ status: 'processed' });
-  let allChunks = [];
-  documents.forEach(doc => allChunks.push(...doc.chunks));
+export const createEmbeddings = async (chunks) => {
+  const results = [];
+  
+  console.log(`Starting Embeddings: Processing ${chunks.length} chunks individually...`);
 
-  // Mock: Return chunks with embeddings "close" to the query
-  return allChunks.slice(0, 3); // Return top 3 chunks (simplified)
+  for (let i = 0; i < chunks.length; i++) {
+    try {
+      const embedding = await generateEmbedding(chunks[i]);
+      results.push({
+        content: chunks[i],
+        embedding,
+        chunkIndex: i,
+      });
+    } catch (err) {
+      console.error(`Embedding failed for chunk ${i}:`, err.message);
+      // Skip failed chunk to keep process alive
+    }
+  }
+
+  return results;
 };
 
 export const retrieveContext = async (query) => {
-  // TODO: Generate embedding for the query (use the same embedding model)
-  const queryEmbedding = generateEmbedding(query);
+  try {
+    const queryEmbedding = await generateEmbedding(query);
 
-  // Retrieve relevant chunks
-  const chunks = await findSimilarChunks(queryEmbedding);
-  return chunks.map(chunk => chunk.content).join('\n\n');
+    const results = await searchVectors(queryEmbedding);
+
+    const context = results
+      .map(item => item.payload.content)
+      .join('\n\n');
+
+    return context;
+  } catch (error) {
+    throw new Error('Context retrieval failed');
+  }
 };

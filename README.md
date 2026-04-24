@@ -11,7 +11,7 @@ DataPilotAI is a comprehensive solution for intelligent document processing, ena
 - **Semantic Search**: Find exact information across thousands of pages
 - **Smart Outputs**: Get structured data in JSON, CSV, or Markdown formats
 - **Google Authentication**: Secure login with Google OAuth
-- **Workspace Management**: Organize documents into projects/workspaces
+- **Workspaces Management**: Organize documents into projects/workspaces
 
 ## Tech Stack
 
@@ -99,4 +99,7 @@ Contributions are welcome! Please follow these steps:
 
 ## License
 
-This project is licensed under the MIT License.
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

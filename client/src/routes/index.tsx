@@ -6,20 +6,18 @@ import Signup from '../pages/Signup';
 import Dashboard from '../pages/Dashboard';
 import Chat from '../pages/Chat';
 import Settings from '../pages/Settings';
-import WorkshopSetup from '../pages/WorkshopSetup';
+import Workspaces from '../pages/Workspaces';
 import CreateProject from '../pages/CreateProject';
 import DocumentViewer from '../pages/DocumentViewer';
 import ProcessingStatus from '../pages/ProcessingStatus';
 import ProtectedRoute from '../utils/ProtectedRoute';
 import AuthRoute from '../utils/AuthRoute';
-// import VerifySuccess from '../pages/VerifySuccess';
 
 const AppRoutes: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        {/* <Route path="/verify-success" element={<VerifySuccess />} /> */}
 
         <Route element={<AuthRoute />}>
           <Route path="/login" element={<Login />} />
@@ -28,9 +26,10 @@ const AppRoutes: React.FC = () => {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/chat/:chatId" element={<Chat />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/workshop-setup" element={<WorkshopSetup />} />
+          <Route path="/workspaces" element={<Workspaces />} />
           <Route path="/create-project" element={<CreateProject />} />
           <Route path="/document/:docId" element={<DocumentViewer />} />
           <Route path="/processing/:docId" element={<ProcessingStatus />} />

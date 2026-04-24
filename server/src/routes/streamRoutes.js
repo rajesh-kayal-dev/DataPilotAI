@@ -1,5 +1,5 @@
 import express from 'express';
-import { orchestrator } from '../../server.js';
+import { processChatFlow } from '../agents/orchestrator.js';
 
 const router = express.Router();
 
@@ -8,16 +8,15 @@ router.get('/', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const task = { query: req.query.query || 'What is AI?' };
+  const question = req.query.query || 'What is AI?';
+  const documentId = req.query.documentId;
 
   try {
     // Run the full workflow: research -> chat
-    const researchResult = await orchestrator.agents.research.execute(task);
-    const responseGenerator = orchestrator.agents.chat.execute(researchResult);
+    const result = await processChatFlow(question, documentId);
 
-    for await (const chunk of responseGenerator) {
-      res.write(`data: ${chunk}\n\n`);
-    }
+    // Send the response
+    res.write(`data: ${result.answer}\n\n`);
   } catch (error) {
     res.write(`data: [ERROR] ${error.message}\n\n`);
   } finally {

@@ -1,28 +1,37 @@
-import { BaseAgent } from './baseAgent.js';
+import axios from 'axios';
+import { config } from '../config/env.js';
 
-export class ChatAgent extends BaseAgent {
-  constructor() {
-    super('ChatAgent');
-  }
+export const runChatAgent = async (question, context) => {
+  const prompt = `
+You are an expert document analyzer. Your task is to answer the QUESTION using ONLY the provided CONTEXT.
 
-  async *execute(task) {
-    this.log(`Chatting about: ${task.query}`);
+STRICT RULES:
+1. Answer strictly based on the CONTEXT provided below.
+2. If the answer is not contained within the CONTEXT, say exactly: "Answer not found in the document"
+3. Do NOT use any external knowledge or general facts.
+4. Do NOT mention "According to the document" or similar phrases. Start directly.
+5. Use clean markdown formatting.
 
-    if (!task.research) {
-      yield '[ERROR] No research data provided.';
-      return;
+CONTEXT:
+${context || 'NO CONTEXT PROVIDED.'}
+
+QUESTION:
+${question}
+
+ANSWER:
+`;
+
+  const response = await axios.post(`${config.ollama.baseUrl}/api/generate`, {
+    model: config.ollama.chatModel,
+    prompt: prompt,
+    stream: false,
+    options: {
+      num_predict: 200,
+      temperature: 0.3,
+      top_p: 0.9,
+      num_ctx: 2048
     }
+  });
 
-    yield `Based on your documents and my knowledge:\n`;
-    yield `Query: "${task.query}"\n`;
-    yield `Context: "${task.research.ragContext.substring(0, 50)}...\n\n`;
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    yield `Here are some relevant sources:\n`;
-    for (const source of task.research.sources) {
-      yield `- ${source.title}: ${source.content || source.url}\n`;
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-  }
-}
+  return response.data.response;
+};

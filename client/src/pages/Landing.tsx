@@ -119,7 +119,7 @@ const Landing: React.FC = () => {
                     Chat
                   </Link>
                   <Link to="/create-project" className="btn-primary" style={{ padding: '10px 22px', fontSize: '14px' }}>
-                    Create Workspace
+                    Create Workspaces
                   </Link>
                 </>
               ) : (
@@ -152,7 +152,7 @@ const Landing: React.FC = () => {
             {isAuthenticated ? (
               <>
                 Welcome back, <span className="text-gradient">{userName}</span><br />
-                Create your next workshop
+                Create your next Workspaces
               </>
             ) : (
               <>
@@ -164,14 +164,14 @@ const Landing: React.FC = () => {
 
           <p className="fade-in fade-in-delay-2 text-[#9C8EAF] max-w-xl mx-auto text-lg leading-relaxed mb-10 font-body">
             {isAuthenticated
-              ? `Hi ${userName}, create a new workshop or continue working on your existing projects.`
+              ? `Hi ${userName}, create a new Workspaces or continue working on your existing projects.`
               : "Upload any PDF, configure your AI pipeline, and start chatting instantly. DataPilotAI makes RAG effortless - no ML degree required."}
           </p>
 
           <div className="fade-in fade-in-delay-3 flex flex-col sm:flex-row gap-4 justify-center mb-16">
             {isAuthenticated ? (
               <Link to="/create-project" className="btn-primary" style={{ fontSize: '16px', padding: '16px 36px' }}>
-                Create Workshop
+                Create Workspaces
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
               </Link>
             ) : (
@@ -355,7 +355,7 @@ const Landing: React.FC = () => {
               <div className="text-4xl mb-4">
                 <svg className="w-12 h-12 mx-auto text-[#9B6FCC]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
               </div>
-              <h3 className="font-display font-bold text-lg text-white mb-3">Create a Workspace</h3>
+              <h3 className="font-display font-bold text-lg text-white mb-3">Create a Workspaces</h3>
               <p className="text-[#7A6B8A] text-sm font-body leading-relaxed">
                 Name your workspace, set the context - legal docs, research, manuals, contracts. Full control from day one.
               </p>
@@ -399,7 +399,7 @@ const Landing: React.FC = () => {
             <h2 className="font-display font-bold mb-5" style={{ fontSize: 'clamp(2rem, 4vw, 3.2rem)', letterSpacing: '-0.02em' }}>
               {isAuthenticated ? (
                 <>
-                  Ready to create your<br /><span className="text-gradient">next workshop, {userName}?</span>
+                  Ready to create your<br /><span className="text-gradient">next Workspaces, {userName}?</span>
                 </>
               ) : (
                 <>
@@ -410,14 +410,14 @@ const Landing: React.FC = () => {
 
             <p className="text-[#7A6B8A] max-w-md mx-auto text-base font-body leading-relaxed mb-8">
               {isAuthenticated
-                ? `Create a new workshop or continue working on your existing projects.`
+                ? `Create a new Workspaces or continue working on your existing projects.`
                 : "Free plan includes 3 projects, 20 documents, and unlimited questions. No credit card needed."}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
               {isAuthenticated ? (
                 <Link to="/create-project" className="btn-primary" style={{ fontSize: '17px', padding: '18px 42px' }}>
-                  Create Workshop
+                  Create Workspaces
                   <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                 </Link>
               ) : (

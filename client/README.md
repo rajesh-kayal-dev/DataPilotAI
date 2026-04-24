@@ -96,11 +96,11 @@ A legal team has 50+ vendor contracts. A lawyer needs to know which contracts in
 - 👉 **Added:** Lazy loading for large chat histories (load last 20 messages, scroll up to fetch more)
 - 👉 **Added:** Chat rename and delete from sidebar
 
-### 2.7 Workspace Structure
+### 2.7 Workspaces Structure
 - Each user has an isolated workspace
 - Upload docs, manage chats, all scoped to workspace context
 - Scalable for future team/organization-level workspaces
-- 👉 **Added:** Workspace ID included in all document and chat records for clean multi-tenancy later
+- 👉 **Added:** Workspaces ID included in all document and chat records for clean multi-tenancy later
 
 ### 2.8 Observability + Logging
 - Request logging on all API endpoints

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import axiosInstance from '../utils/axiosInstance';
 
 const steps = [
   { id: 1, title: 'Upload Complete' },
@@ -18,8 +19,24 @@ const ProcessingStatus: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [chunksCreated, setChunksCreated] = useState<number>(0);
   const [timeTaken, setTimeTaken] = useState<number>(0);
-  const docSize = '2.4 MB'; // Simulated size
+  const [document, setDocument] = useState<any>(null);
   
+  const [isFailed, setIsFailed] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchDoc = async () => {
+      if (!docId) return;
+      try {
+        const res = await axiosInstance.get(`/api/documents`);
+        const doc = res.data.find((d: any) => d._id === docId);
+        if (doc) setDocument(doc);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchDoc();
+  }, [docId]);
+
   // Timer
   useEffect(() => {
     const timer = setInterval(() => {
@@ -28,44 +45,44 @@ const ProcessingStatus: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Simulate process progression
+  // Poll backend for actual status
   useEffect(() => {
+    if (!docId) return;
+
     let timeout: NodeJS.Timeout;
 
-    if (currentStep === 1) {
-      // Upload Complete -> Text Extraction
-      timeout = setTimeout(() => setCurrentStep(2), 1500);
-    } else if (currentStep === 2) {
-      // Text Extraction -> Chunking
-      timeout = setTimeout(() => setCurrentStep(3), 2500);
-    } else if (currentStep === 3) {
-      // Chunking -> Embedding
-      // Simulate chunk counting
-      let chunks = 0;
-      const chunkInterval = setInterval(() => {
-        chunks += 12;
-        setChunksCreated(chunks);
-        if (chunks > 140) {
-          clearInterval(chunkInterval);
-          setCurrentStep(4);
+    const pollStatus = async () => {
+      try {
+        const res = await axiosInstance.get(`/api/documents/${docId}/status`);
+        const { status } = res.data;
+
+        if (status === 'uploaded') {
+          setCurrentStep(1);
+        } else if (status === 'processing') {
+          setCurrentStep(3); // Just an intermediate visual step
+          setChunksCreated((prev) => prev + Math.floor(Math.random() * 5));
+        } else if (status === 'ready') {
+          setCurrentStep(6);
+          setTimeout(() => {
+            navigate(`/chat/${docId}`);
+          }, 1500);
+          return; // Stop polling
+        } else if (status === 'failed') {
+          setIsFailed(true);
+          return; // Stop polling
         }
-      }, 150);
-      return () => clearInterval(chunkInterval);
-    } else if (currentStep === 4) {
-      // Embedding -> Indexing
-      timeout = setTimeout(() => setCurrentStep(5), 3000);
-    } else if (currentStep === 5) {
-      // Indexing -> Ready
-      timeout = setTimeout(() => setCurrentStep(6), 2000);
-    } else if (currentStep === 6) {
-      // Ready -> Redirect
-      timeout = setTimeout(() => {
-        navigate(`/document/${docId || 'new-doc'}`);
-      }, 1500);
-    }
+
+        timeout = setTimeout(pollStatus, 3000);
+      } catch (error) {
+        console.error('Error polling status:', error);
+        timeout = setTimeout(pollStatus, 5000);
+      }
+    };
+
+    pollStatus();
 
     return () => clearTimeout(timeout);
-  }, [currentStep, navigate, docId]);
+  }, [docId, navigate]);
 
   return (
     <MainLayout>
@@ -94,8 +111,10 @@ const ProcessingStatus: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <div className="text-sm font-medium text-white mb-1">Contract_Agreement_2026.pdf</div>
-                <div className="text-xs text-[#7A6B8A]">Size: {docSize}</div>
+                <div className="text-sm font-medium text-white mb-1 truncate max-w-[200px]">
+                  {document?.name || 'Loading...'}
+                </div>
+                <div className="text-xs text-[#7A6B8A]">Size: {(document?.size / 1024 / 1024).toFixed(2)} MB</div>
               </div>
             </div>
             
@@ -160,7 +179,18 @@ const ProcessingStatus: React.FC = () => {
             </div>
           </div>
           
-          {currentStep === 6 && (
+          {isFailed && (
+            <div className="mt-12 text-center animate-fade-up">
+              <p className="text-sm text-red-500 font-medium flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Processing failed. Please try again.
+              </p>
+            </div>
+          )}
+
+          {currentStep === 6 && !isFailed && (
             <div className="mt-12 text-center animate-fade-up">
               <p className="text-sm text-[#34D399] font-medium flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

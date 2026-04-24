@@ -16,18 +16,10 @@ const documentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    chunks: [
-      {
-        content: {
-          type: String,
-          required: true,
-        },
-        embedding: {
-          type: [Number], // Store vector embeddings
-          required: false,
-        },
-      },
-    ],
+    filePath: {
+      type: String,
+      required: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -35,12 +27,17 @@ const documentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['uploaded', 'processing', 'processed', 'failed'],
+      enum: ['uploaded', 'processing', 'ready', 'failed'],
       default: 'uploaded',
+    },
+    workspaceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Workspace',
+      required: true,
     },
   },
   {
-    timestamps: true, 
+    timestamps: true,
   }
 );
 

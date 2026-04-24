@@ -1,167 +1,168 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Message from '../components/Message';
 import ChatInput from '../components/ChatInput';
+import axiosInstance from '../utils/axiosInstance';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface ChatMessage {
-  id: number;
+  _id?: string;
+  id?: number;
   role: 'user' | 'assistant';
   content: string;
   source?: string;
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
-
 const Chat: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      role: 'assistant',
-      content: 'Hello! I am ready to help you analyze your documents. What would you like to know?',
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
+  const { chatId } = useParams<{ chatId: string }>();
+  const navigate = useNavigate();
+  const { activeWorkspaceId, setActiveChatId } = useWorkspace();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatTitle, setChatTitle] = useState<string>('New Chat');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = (content: string) => {
-    const newMessage: ChatMessage = {
-      id: messages.length + 1,
-      role: 'user',
-      content,
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (chatId) setActiveChatId(chatId);
+  }, [chatId]);
+
+  useEffect(() => {
+    const fetchChat = async () => {
+      if (!chatId) return;
+      try {
+        const res = await axiosInstance.get(`/api/chats/${chatId}`);
+        setMessages(res.data.messages);
+        setChatTitle(res.data.title);
+      } catch (err) {
+        console.error('Failed to fetch chat', err);
+        navigate('/dashboard');
+      }
     };
+    fetchChat();
+  }, [chatId]);
 
-    setMessages([...messages, newMessage]);
+  const handleSend = async (content: string) => {
+    if (!content.trim() || !chatId) return;
 
-    setTimeout(() => {
+    const userMsg: ChatMessage = { role: 'user', content };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setIsLoading(true);
+
+    try {
+      // 1. Get AI Answer (using orchestrator which takes documentId, but for workspace chat we need a different approach or just use the last uploaded doc for now)
+      // For now, let's assume we chat with ALL docs in workspace or the orchestrator handles it.
+      // Actually, let's fetch docs for this workspace and use the first one if it exists.
+      const docRes = await axiosInstance.get(`/api/documents?workspaceId=${activeWorkspaceId}`);
+      const documentId = docRes.data.length > 0 ? docRes.data[0]._id : null;
+
+      const res = await axiosInstance.post('/api/documents/chat', { 
+        question: content,
+        documentId 
+      });
+      
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: res.data.answer || 'Answer not found in document',
+        source: res.data.source,
+      };
+
+      const finalMessages = [...updatedMessages, assistantMsg];
+      setMessages(finalMessages);
+
+      // 2. Save Messages and Handle Naming
+      let newTitle = chatTitle;
+      if (messages.length === 0) {
+        // Auto-name after first message
+        const words = content.split(' ').slice(0, 6).join(' ');
+        newTitle = words.length > 30 ? words.slice(0, 30) + '...' : words;
+        setChatTitle(newTitle);
+      }
+
+      await axiosInstance.patch(`/api/chats/${chatId}`, {
+        title: newTitle,
+        messages: finalMessages
+      });
+
+    } catch (error) {
+      console.error(error);
       setMessages((prev) => [
         ...prev,
-        {
-          id: prev.length + 1,
-          role: 'assistant',
-          content: 'Based on the uploaded documents, I found relevant information. The key findings are summarized below with source references.',
-          source: 'document.pdf • Page 12',
-        },
+        { role: 'assistant', content: 'An error occurred while communicating with the server.' },
       ]);
-    }, 1000);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-    handleSend(input);
-    setInput('');
-  };
-
-  const handleVoiceInput = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        recognition.interimResults = true;
-        recognition.continuous = true;
-
-        recognition.onresult = (event) => {
-          const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
-            .join('');
-          setInput(transcript);
-        };
-
-        recognition.onerror = () => {
-          setIsRecording(false);
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognition.start();
-      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <MainLayout>
-      <div className="flex-1 flex flex-col h-full relative z-10 w-full overflow-hidden">
-        <div className="flex-1 overflow-y-auto flex flex-col w-full">
-          <div className="flex-1 flex flex-col items-center w-full max-w-3xl mx-auto py-10 px-4 md:px-0">
-            {!messages.length && (
-              <>
-                <div className="orb mb-8"></div>
-                <h1 className="text-2xl md:text-3xl font-medium text-white mb-8 tracking-wide text-center">Ask Questions About Your Documents</h1>
-                <div className="flex flex-wrap justify-center gap-2.5">
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-full glass-card hover:bg-white/10 text-white/80 text-[11px] md:text-xs">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Ask Questions
-                  </button>
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-full glass-card hover:bg-white/10 text-white/80 text-[11px] md:text-xs">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Summarize Document
-                  </button>
-                </div>
-              </>
-            )}
-
-            <div className="w-full mt-4 group">
-              {messages.map((msg) => (
-                <Message key={msg.id} role={msg.role} content={msg.content} source={msg.source} />
-              ))}
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#08060E]">
+        {/* Chat Header */}
+        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-[#08060E]/80 backdrop-blur-md z-20">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-brand/20 flex items-center justify-center text-brand">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
             </div>
-          </div>
-
-          <div className="w-full max-w-3xl mx-auto pb-6 md:pb-8 shrink-0 px-4 md:px-0">
-            <div className="relative rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10 overflow-hidden">
-              {isRecording && (
-                <div className="absolute inset-0 flex items-center justify-between gap-4 p-3 md:p-4 z-10 bg-[#0f0a1a]/95 animate-fade-in">
-                  <div className="flex-1 flex items-center justify-center gap-1 h-12">
-                    {[...Array(40)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-1.5 bg-gradient-to-t from-brand to-purple-400 rounded-full animate-pulse"
-                        style={{
-                          height: `${Math.random() * 24 + 8}px`,
-                          animationDelay: `${i * 0.03}s`,
-                          animationDuration: '0.8s'
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button 
-                      onClick={() => { setIsRecording(false); setInput(''); }} 
-                      className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                    <button 
-                      onClick={() => { setIsRecording(false); if (input) handleSend(input); }} 
-                      className="p-3 rounded-full bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-all"
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              <div className={`transition-opacity duration-300 ${isRecording ? 'opacity-0' : 'opacity-100'}`}>
-                <ChatInput onSend={handleSend} />
-                <button
-                  type="button"
-                  onClick={handleVoiceInput}
-                  className="absolute right-14 bottom-3 p-2 text-white/40 hover:text-brand transition-colors"
-                  title="Voice input"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                </button>
+            <div>
+              <h2 className="text-sm font-semibold text-white truncate max-w-[200px] md:max-w-md">
+                {chatTitle}
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                <span className="text-[10px] text-white/40 uppercase tracking-wider font-bold">Workspace AI Ready</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto pt-4 pb-32 px-4 md:px-0 scrollbar-hide">
+          <div className="max-w-3xl mx-auto space-y-6">
+            {messages.length === 0 && !isLoading && (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/10">
+                  <svg className="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                </div>
+                <h3 className="text-lg font-medium text-white mb-2">New conversation</h3>
+                <p className="text-white/40 text-sm max-w-xs">Ask anything about the documents in this workspace.</p>
+              </div>
+            )}
+            {messages.map((msg, idx) => (
+              <Message key={idx} role={msg.role} content={msg.content} source={msg.source} />
+            ))}
+            {isLoading && (
+              <div className="flex justify-start mb-4">
+                <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span className="text-xs text-white/50">Thinking...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Fixed Chat Input Area */}
+        <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-[#08060E] via-[#08060E] to-transparent z-20">
+          <div className="max-w-3xl mx-auto relative group">
+            <ChatInput onSend={handleSend} />
+            <p className="text-[10px] text-center text-white/20 mt-3 font-medium">
+              DataPilotAI can make mistakes. Verify important information.
+            </p>
           </div>
         </div>
       </div>
