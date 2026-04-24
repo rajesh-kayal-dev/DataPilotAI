@@ -99,7 +99,15 @@ Contributions are welcome! Please follow these steps:
 
 ## License
 
+<<<<<<< HEAD
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+=======
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
+>>>>>>> ca286c6804e7e3153eca561d244d29813d9d6a41
