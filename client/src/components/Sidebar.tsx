@@ -4,6 +4,7 @@ import Logo from './Logo';
 import { logout } from '../utils/auth';
 import axiosInstance from '../utils/axiosInstance';
 import { useWorkspace } from '../context/WorkspaceContext';
+import ModelSelector from './ModelSelector';
 
 interface Document {
   _id: string;
@@ -251,6 +252,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
       </div>
 
       <div className="relative mt-auto border-t border-white/5 py-3">
+        {!collapsed && (
+          <div className="px-3 mb-4">
+            <ModelSelector />
+          </div>
+        )}
         <button onClick={() => setProfileOpen(!profileOpen)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors outline-none">
           <img src="https://i.pravatar.cc/150?img=11" alt="Profile" className="w-8 h-8 rounded-full shrink-0 object-cover border border-white/10" />
           {!collapsed && (

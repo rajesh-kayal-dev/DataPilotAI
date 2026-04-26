@@ -20,15 +20,22 @@ const documentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    user: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
     status: {
       type: String,
-      enum: ['uploaded', 'processing', 'ready', 'failed'],
-      default: 'uploaded',
+      enum: ['pending', 'processing', 'completed', 'failed'],
+      default: 'pending',
+    },
+    retryCount: {
+      type: Number,
+      default: 0,
+    },
+    lastError: {
+      type: String,
     },
     workspaceId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -40,6 +47,9 @@ const documentSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Add index for faster multi-tenant queries
+documentSchema.index({ userId: 1, workspaceId: 1 });
 
 const Document = mongoose.model('Document', documentSchema);
 

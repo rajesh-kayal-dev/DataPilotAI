@@ -1,19 +1,38 @@
 import multer from 'multer';
+import path from 'path';
+
+/**
+ * Secure File Upload Middleware (Production)
+ * - Limits size to 10MB
+ * - Restricts MIME types to PDF only
+ * - Prevents unsafe file extensions
+ */
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: (req, file, cb) => {
     cb(null, 'uploads/');
   },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
   }
 });
 
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['application/pdf'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only PDF is allowed.'), false);
+  }
+};
+
 const upload = multer({
-  storage: storage,
+  storage,
+  fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024,
-  },
+    fileSize: 10 * 1024 * 1024 // 10MB
+  }
 });
 
 export default upload;

@@ -1,12 +1,14 @@
 import express from 'express';
-import { createChat, getChats, getChatById, updateChat, deleteChat } from '../controllers/chatController.js';
+import { handleChat } from '../controllers/chatController.js';
+import { procted } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', createChat);
-router.get('/', getChats);
-router.get('/:id', getChatById);
-router.patch('/:id', updateChat);
-router.delete('/:id', deleteChat);
+/**
+ * Chat Route
+ * POST /api/chat
+ * Body: { question, documentId }
+ */
+router.post('/', procted, handleChat);
 
 export default router;

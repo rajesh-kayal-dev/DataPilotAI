@@ -1,11 +1,16 @@
 import Document from '../models/Document.js';
-import { chunkText, createEmbeddings } from './ragService.js';
-import { insertVectors, deleteVectors } from './vector/qdrantService.js';
+import { generateEmbedding } from './embeddingService.js';
+import { insertVectors, deleteVectorsByDocId } from './vectorService.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
+
+/**
+ * Document Service (Production V3)
+ * Responsible for RAG pipeline with robust status tracking.
+ */
 
 export const uploadDocument = async (file, userId, workspaceId) => {
   try {
@@ -14,123 +19,85 @@ export const uploadDocument = async (file, userId, workspaceId) => {
       type: file.mimetype.split('/')[1],
       size: file.size,
       filePath: file.path,
-      user: userId,
+      userId: userId,
       workspaceId,
-      status: 'uploaded',
+      status: 'pending',
     });
 
     await document.save();
     return { success: true, document };
   } catch (error) {
-    throw new Error(`Failed to upload document: ${error.message}`);
+    throw new Error(`Failed to upload: ${error.message}`);
   }
 };
 
-const cleanText = (text) => {
-  if (!text) return "";
-  
-  return text
-    // 1. Fix broken words with hyphens at line breaks
-    .replace(/-\s*\n/g, "")
-    // 2. Fix spaced out letters like "S t r u c t u r e s"
-    // This regex looks for 3 or more single letters separated by spaces
-    .replace(/(?:\b[A-Za-z]\s+){2,}[A-Za-z]\b/g, (match) => match.replace(/\s+/g, ""))
-    // 3. Fix broken words like "Dat a"
-    .replace(/(\b[A-Z][a-z]*)\s+(?=[a-z]\b)/g, "$1")
-    // 4. Normalize newlines
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    // 5. Collapse horizontal spaces (preserve newlines)
-    .replace(/[^\S\r\n]+/g, " ")
-    .trim();
-};
-
 export const processDocument = async (documentId) => {
+  const document = await Document.findById(documentId);
+  if (!document) throw new Error('Document not found');
+
   try {
-    const document = await Document.findById(documentId);
-    if (!document) throw new Error('Document not found');
+    await Document.findByIdAndUpdate(documentId, { status: 'processing' });
 
-    document.status = 'processing';
-    await document.save();
+    // 1. Clear old vectors
+    await deleteVectorsByDocId(documentId);
 
-    // Reset Qdrant vectors for this document before reprocessing
-    await deleteVectors(documentId);
-
+    // 2. Extract Text
     let text = '';
-
     if (document.type === 'pdf') {
       const dataBuffer = fs.readFileSync(document.filePath);
-
       const pdfData = await pdfParse(dataBuffer);
-
       text = pdfData.text;
     } else {
       text = fs.readFileSync(document.filePath, 'utf8');
     }
 
-    if (!text || text.trim().length < 20) {
-      throw new Error('Empty or invalid extracted text');
+    if (!text || text.trim().length < 20) throw new Error('No readable text found in document');
+
+    // 3. Clean & Chunk
+    text = text.replace(/-\s*\n/g, "").replace(/\r\n/g, "\n").trim();
+    const chunks = text.split('\n\n').filter(c => c.length > 50);
+
+    // 4. Create Embeddings & Index
+    const points = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const embedding = await generateEmbedding(chunks[i]);
+      points.push({
+        id: uuidv4(),
+        vector: embedding,
+        payload: {
+          docId: documentId.toString(),
+          content: chunks[i],
+          chunkIndex: i,
+        },
+      });
     }
 
-    text = cleanText(text);
-    console.log('CLEANED TEXT PREVIEW:', text.slice(0, 200));
-
-    const chunks = chunkText(text);
-
-    if (!chunks || chunks.length === 0) {
-      throw new Error('Chunking failed');
-    }
-
-    const embeddedChunks = await createEmbeddings(chunks);
-
-    const points = embeddedChunks.map((chunk) => ({
-      id: uuidv4(),
-      vector: chunk.embedding,
-      payload: {
-        docId: documentId.toString(),
-        content: chunk.content,
-        chunkIndex: chunk.chunkIndex,
-      },
-    }));
-
+    // 5. Save to Vector DB
     await insertVectors(points);
 
-    document.status = 'ready';
-    await document.save();
-
+    await Document.findByIdAndUpdate(documentId, { status: 'completed' });
     return { success: true };
 
   } catch (error) {
-    console.error('Processing error:', error.message);
-
-    await Document.findByIdAndUpdate(documentId, {
+    await Document.findByIdAndUpdate(documentId, { 
       status: 'failed',
+      $inc: { retryCount: 1 },
+      lastError: error.message 
     });
-
-    return { success: false };
+    throw error; // Re-throw for BullMQ retry
   }
 };
 
 export const listDocuments = async (userId, workspaceId) => {
-  const query = { user: userId };
-  if (workspaceId) query.workspaceId = workspaceId;
-  return await Document.find(query).sort({ createdAt: -1 });
+  return await Document.find({ userId, workspaceId }).sort({ createdAt: -1 });
 };
 
 export const deleteDocument = async (documentId) => {
   const document = await Document.findById(documentId);
   if (!document) throw new Error('Document not found');
 
-  // 1. Remove from Qdrant
-  await deleteVectors(documentId);
-
-  // 2. Remove file from disk
-  if (fs.existsSync(document.filePath)) {
-    fs.unlinkSync(document.filePath);
-  }
-
-  // 3. Remove from MongoDB
+  await deleteVectorsByDocId(documentId);
+  if (fs.existsSync(document.filePath)) fs.unlinkSync(document.filePath);
   await Document.findByIdAndDelete(documentId);
-
   return { success: true };
 };

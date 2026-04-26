@@ -27,7 +27,16 @@ const userSchema = new mongoose.Schema({
     isVerified: {
         type: Boolean,
         default: false
-    }
+    },
+    plan: {
+        type: String,
+        enum: ['free', 'pro'],
+        default: 'free',
+    },
+    selectedModel: {
+        type: String,
+        default: 'mimo-flash',
+    },
 }, { timestamps: true })
 
 export default mongoose.model("User", userSchema);

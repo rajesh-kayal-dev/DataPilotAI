@@ -1,47 +1,55 @@
-import { generateEmbedding } from '../utils/embedding.js';
-import { searchVectors } from '../services/vector/qdrantService.js';
+import { generateEmbedding } from '../services/embeddingService.js';
+import { searchVectors } from '../services/vectorService.js';
+import { config } from '../config/env.js';
+import { calculateConfidence } from '../utils/confidenceScore.js';
 
-export const runResearchAgent = async (question, documentId) => {
-  console.log(`Research Agent: Searching for "${question}" in doc: ${documentId}`);
-  
+/**
+ * Research Agent (Production V3)
+ * Handles semantic search with dynamic thresholds based on intent.
+ */
+export const retrieveContext = async (question, documentId, isSummary = false) => {
+  // 1. Vector Search
   const queryEmbedding = await generateEmbedding(question);
-  const results = await searchVectors(queryEmbedding, documentId);
+  const rawResults = await searchVectors(queryEmbedding, documentId);
 
-  // 1. Log all retrieved docIds to verify filtering
-  const retrievedDocIds = [...new Set(results.map(r => r.docId))];
-  console.log(`Retrieved Doc IDs: ${JSON.stringify(retrievedDocIds)}`);
+  // 2. Dynamic Filtering
+  // For summaries/overviews, we are more generous (lower threshold)
+  const threshold = isSummary ? 0.3 : config.rag.threshold;
+  let filtered = rawResults.filter(item => item.score >= threshold);
 
-  // 2. Filter by threshold (0.4)
-  let filteredResults = results.filter(item => item.score >= 0.4);
-  console.log(`Chunks above threshold (0.4): ${filteredResults.length}/${results.length}`);
-
-  // 3. Fallback: if nothing matches threshold, but we have results, take best 1 IF it's not totally irrelevant
-  if (filteredResults.length === 0 && results.length > 0 && results[0].score > 0.25) {
-    console.log(`Low confidence match (score: ${results[0].score}), using as fallback.`);
-    filteredResults = [results[0]];
+  // 3. Diversity Filtering for Summaries
+  let finalChunks = [];
+  if (isSummary) {
+    const topK = config.rag.topK * 2;
+    const pool = filtered.slice(0, topK);
+    
+    pool.forEach(chunk => {
+      const isDuplicate = finalChunks.some(f => 
+        f.content.substring(0, 50) === chunk.content.substring(0, 50)
+      );
+      if (!isDuplicate && finalChunks.length < config.rag.topK) {
+        finalChunks.push(chunk);
+      }
+    });
+  } else {
+    finalChunks = filtered.slice(0, config.rag.topK);
   }
 
-  // 4. Take top 5
-  const topChunks = filteredResults.slice(0, 5);
-  
-  // 5. Build context and validate
-  let context = topChunks.map(item => item.content).join("\n\n");
-  
-  // Remove duplicate sentences
-  const sentences = context.split(". ");
-  const uniqueSentences = [...new Set(sentences)];
-  context = uniqueSentences.join(". ");
+  // 4. Advanced Scoring
+  const confidence = calculateConfidence(question, finalChunks);
 
-  // 6. Hard limit and length validation
-  if (context.length > 2000) {
-    context = context.slice(0, 2000);
-  }
+  // 5. Format Output
+  const context = finalChunks.map(item => item.content.trim()).join('\n\n');
+  const snippets = finalChunks.map(item => {
+    const text = item.content.trim();
+    return text.length > 120 ? text.substring(0, 120) + '...' : text;
+  });
 
-  if (context.length < 200) {
-    console.log("Context too short (< 200 chars), returning empty to trigger fallback.");
-    context = "";
-  }
-
-  console.log(`Research Complete. Selected Chunks: ${topChunks.length}. Top Score: ${results[0]?.score || 0}`);
-  return { context, topChunks };
+  return {
+    context,
+    confidence: confidence.score,
+    alignment: confidence.alignment,
+    isReliable: confidence.isReliable,
+    chunks: snippets
+  };
 };
