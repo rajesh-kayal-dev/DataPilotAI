@@ -39,9 +39,8 @@ const Chat: React.FC = () => {
     const fetchChat = async () => {
       if (!chatId) return;
       try {
-        const res = await axiosInstance.get(`/api/chats/${chatId}`);
-        setMessages(res.data.messages);
-        setChatTitle(res.data.title);
+        setMessages([]);
+        setChatTitle('New Chat');
       } catch (err) {
         console.error('Failed to fetch chat', err);
         navigate('/dashboard');
@@ -51,7 +50,7 @@ const Chat: React.FC = () => {
   }, [chatId]);
 
   const handleSend = async (content: string) => {
-    if (!content.trim() || !chatId) return;
+    if (!content.trim() || isLoading) return;
 
     const userMsg: ChatMessage = { role: 'user', content };
     const updatedMessages = [...messages, userMsg];
@@ -62,17 +61,18 @@ const Chat: React.FC = () => {
       // 1. Get AI Answer (using orchestrator which takes documentId, but for workspace chat we need a different approach or just use the last uploaded doc for now)
       // For now, let's assume we chat with ALL docs in workspace or the orchestrator handles it.
       // Actually, let's fetch docs for this workspace and use the first one if it exists.
-      const docRes = await axiosInstance.get(`/api/documents?workspaceId=${activeWorkspaceId}`);
-      const documentId = docRes.data.length > 0 ? docRes.data[0]._id : null;
+      const docRes = await axiosInstance.get(`/api/v1/documents?workspaceId=${activeWorkspaceId}`);
+      const safeDocuments = Array.isArray(docRes.data) ? docRes.data : [];
+      const documentId = safeDocuments.length > 0 ? safeDocuments[0]?._id : null;
 
-      const res = await axiosInstance.post('/api/documents/chat', { 
+      const res = await axiosInstance.post('/api/v1/chat', { 
         question: content,
         documentId 
       });
       
       const assistantMsg: ChatMessage = {
         role: 'assistant',
-        content: res.data.answer || 'Answer not found in document',
+        content: res.data?.answer?.trim() ? res.data.answer : 'No response generated',
         source: res.data.source,
       };
 
@@ -88,16 +88,11 @@ const Chat: React.FC = () => {
         setChatTitle(newTitle);
       }
 
-      await axiosInstance.patch(`/api/chats/${chatId}`, {
-        title: newTitle,
-        messages: finalMessages
-      });
-
     } catch (error) {
       console.error(error);
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'An error occurred while communicating with the server.' },
+        { role: 'assistant', content: 'Something went wrong. Please try again.' },
       ]);
     } finally {
       setIsLoading(false);
@@ -137,8 +132,21 @@ const Chat: React.FC = () => {
                 <p className="text-white/40 text-sm max-w-xs">Ask anything about the documents in this workspace.</p>
               </div>
             )}
-            {messages.map((msg, idx) => (
-              <Message key={idx} role={msg.role} content={msg.content} source={msg.source} />
+            {(Array.isArray(messages) ? messages : []).map((msg, idx) => (
+              <div key={idx} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <span className="text-[10px] uppercase tracking-wider text-white/35 font-semibold px-1">
+                  {msg.role === 'user' ? 'You' : 'AI Assistant'}
+                </span>
+                <div className="w-full">
+                  <Message role={msg.role} content={msg.content} source={msg.source} />
+                </div>
+                {msg.role === 'assistant' && (((msg as any).modelName) || ((msg as any).confidence !== undefined)) && (
+                  <div className="px-1 text-[10px] text-white/40 flex items-center gap-3">
+                    {(msg as any).modelName && <span>Model: {(msg as any).modelName}</span>}
+                    {(msg as any).confidence !== undefined && <span>Confidence: {Number((msg as any).confidence).toFixed(2)}</span>}
+                  </div>
+                )}
+              </div>
             ))}
             {isLoading && (
               <div className="flex justify-start mb-4">
@@ -148,7 +156,7 @@ const Chat: React.FC = () => {
                     <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                     <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-xs text-white/50">Thinking...</span>
+                  <span className="text-xs text-white/50">AI is typing...</span>
                 </div>
               </div>
             )}
@@ -159,7 +167,12 @@ const Chat: React.FC = () => {
         {/* Fixed Chat Input Area */}
         <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-[#08060E] via-[#08060E] to-transparent z-20">
           <div className="max-w-3xl mx-auto relative group">
-            <ChatInput onSend={handleSend} />
+            <div className={isLoading ? 'opacity-70 pointer-events-none' : ''}>
+              <ChatInput onSend={handleSend} />
+            </div>
+            {isLoading && (
+              <div className="absolute inset-0 rounded-2xl" aria-hidden="true" />
+            )}
             <p className="text-[10px] text-center text-white/20 mt-3 font-medium">
               DataPilotAI can make mistakes. Verify important information.
             </p>

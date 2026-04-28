@@ -9,7 +9,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const res = await axiosInstance.get('/api/documents');
+        const res = await axiosInstance.get('/api/v1/documents');
         setDocCount(res.data.length);
       } catch (err) {
         console.error(err);

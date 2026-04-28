@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance';
 
 interface Model {
   id: string;
@@ -39,7 +39,7 @@ const ModelSelector: React.FC = () => {
 
   const fetchModels = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/models');
+      const res = await axiosInstance.get('/api/v1/models');
       setModels(res.data);
     } catch (err) {
       console.error('Failed to fetch models');
@@ -48,9 +48,7 @@ const ModelSelector: React.FC = () => {
 
   const fetchUserPreference = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/models/user', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const res = await axiosInstance.get('/api/v1/models/user');
       setCurrentModelId(res.data.modelId);
       setUserPlan(res.data.plan);
     } catch (err) {
@@ -66,10 +64,7 @@ const ModelSelector: React.FC = () => {
 
     setLoading(true);
     try {
-      await axios.patch('http://localhost:5000/api/models/user', 
-        { modelId: model.id },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }}
-      );
+      await axiosInstance.patch('/api/v1/models/user', { modelId: model.id });
       setCurrentModelId(model.id);
       setIsOpen(false);
     } catch (err: any) {
@@ -83,7 +78,23 @@ const ModelSelector: React.FC = () => {
 
   if (!models) return null;
 
-  const currentModel = [...models.champions, ...models.free.top, ...models.free.specialized, ...models.free.experimental, ...models.paid.budget, ...models.paid.mid, ...models.paid.premium].find(m => m.id === currentModelId);
+  const safeChampions = Array.isArray(models?.champions) ? models.champions : [];
+  const safeFreeTop = Array.isArray(models?.free?.top) ? models.free.top : [];
+  const safeFreeSpecialized = Array.isArray(models?.free?.specialized) ? models.free.specialized : [];
+  const safeFreeExperimental = Array.isArray(models?.free?.experimental) ? models.free.experimental : [];
+  const safePaidBudget = Array.isArray(models?.paid?.budget) ? models.paid.budget : [];
+  const safePaidMid = Array.isArray(models?.paid?.mid) ? models.paid.mid : [];
+  const safePaidPremium = Array.isArray(models?.paid?.premium) ? models.paid.premium : [];
+
+  const currentModel = [
+    ...safeChampions,
+    ...safeFreeTop,
+    ...safeFreeSpecialized,
+    ...safeFreeExperimental,
+    ...safePaidBudget,
+    ...safePaidMid,
+    ...safePaidPremium
+  ].find(m => m.id === currentModelId);
 
   return (
     <div className="relative">
@@ -104,7 +115,7 @@ const ModelSelector: React.FC = () => {
           {/* Champions Section */}
           <div className="mb-4">
             <h4 className="px-3 py-1 text-[10px] uppercase tracking-wider text-white/30 font-bold">Champions</h4>
-            {models.champions.map(m => (
+            {safeChampions.map(m => (
               <ModelItem key={m.id} model={m} isSelected={m.id === currentModelId} isLocked={m.type === 'paid' && userPlan === 'free'} onSelect={() => handleSelect(m)} />
             ))}
           </div>
@@ -112,7 +123,7 @@ const ModelSelector: React.FC = () => {
           {/* Free Models */}
           <div className="mb-4">
             <h4 className="px-3 py-1 text-[10px] uppercase tracking-wider text-white/30 font-bold">Free Models</h4>
-            {[...models.free.top, ...models.free.specialized].map(m => (
+            {[...safeFreeTop, ...safeFreeSpecialized].map(m => (
               <ModelItem key={m.id} model={m} isSelected={m.id === currentModelId} isLocked={false} onSelect={() => handleSelect(m)} />
             ))}
           </div>
@@ -120,7 +131,7 @@ const ModelSelector: React.FC = () => {
           {/* Paid Models */}
           <div>
             <h4 className="px-3 py-1 text-[10px] uppercase tracking-wider text-white/30 font-bold">Paid Models</h4>
-            {[...models.paid.mid, ...models.paid.premium].map(m => (
+            {[...safePaidMid, ...safePaidPremium].map(m => (
               <ModelItem key={m.id} model={m} isSelected={m.id === currentModelId} isLocked={userPlan === 'free'} onSelect={() => handleSelect(m)} />
             ))}
           </div>

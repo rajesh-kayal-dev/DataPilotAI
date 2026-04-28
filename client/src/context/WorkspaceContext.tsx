@@ -24,11 +24,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
   const refreshWorkspaces = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setWorkspaces([]);
+      setActiveWorkspaceId(null);
+      return;
+    }
+
     try {
-      const res = await axiosInstance.get('/api/workspaces');
-      setWorkspaces(res.data);
-      if (res.data.length > 0 && !activeWorkspaceId) {
-        setActiveWorkspaceId(res.data[0]._id);
+      const res = await axiosInstance.get('/api/v1/workspaces');
+      const safeWorkspaces = Array.isArray(res.data) ? res.data : [];
+      setWorkspaces(safeWorkspaces);
+      if (safeWorkspaces.length > 0 && !activeWorkspaceId) {
+        setActiveWorkspaceId(safeWorkspaces[0]._id);
       }
     } catch (err) {
       console.error('Failed to fetch workspaces', err);
@@ -36,10 +44,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const createWorkspace = async (name: string) => {
-    const res = await axiosInstance.post('/api/workspaces', { name });
-    setWorkspaces(prev => [res.data, ...prev]);
-    setActiveWorkspaceId(res.data._id);
-    return res.data;
+    const res = await axiosInstance.post('/api/v1/workspaces', { name });
+    const createdWorkspace = res.data?.workspace || res.data;
+    if (!createdWorkspace?._id) {
+      throw new Error('Invalid workspace response');
+    }
+    setWorkspaces(prev => [createdWorkspace, ...prev]);
+    setActiveWorkspaceId(createdWorkspace._id);
+    return createdWorkspace;
   };
 
   useEffect(() => {

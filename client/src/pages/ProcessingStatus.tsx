@@ -27,7 +27,7 @@ const ProcessingStatus: React.FC = () => {
     const fetchDoc = async () => {
       if (!docId) return;
       try {
-        const res = await axiosInstance.get(`/api/documents`);
+        const res = await axiosInstance.get(`/api/v1/documents`);
         const doc = res.data.find((d: any) => d._id === docId);
         if (doc) setDocument(doc);
       } catch (err) {
@@ -53,7 +53,7 @@ const ProcessingStatus: React.FC = () => {
 
     const pollStatus = async () => {
       try {
-        const res = await axiosInstance.get(`/api/documents/${docId}/status`);
+        const res = await axiosInstance.get(`/api/v1/documents/${docId}/status`);
         const { status } = res.data;
 
         if (status === 'uploaded') {
@@ -64,7 +64,7 @@ const ProcessingStatus: React.FC = () => {
         } else if (status === 'ready') {
           setCurrentStep(6);
           setTimeout(() => {
-            navigate(`/chat/${docId}`);
+            navigate('/chat');
           }, 1500);
           return; // Stop polling
         } else if (status === 'failed') {

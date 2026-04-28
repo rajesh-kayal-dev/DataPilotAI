@@ -47,12 +47,9 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     const fetchDocsAndChats = async () => {
       if (!activeWorkspaceId) return;
       try {
-        const [docRes, chatRes] = await Promise.all([
-          axiosInstance.get(`/api/documents?workspaceId=${activeWorkspaceId}`),
-          axiosInstance.get(`/api/chats?workspaceId=${activeWorkspaceId}`)
-        ]);
-        setDocuments(docRes.data);
-        setChats(chatRes.data);
+        const docRes = await axiosInstance.get(`/api/v1/documents?workspaceId=${activeWorkspaceId}`);
+        setDocuments(Array.isArray(docRes.data) ? docRes.data : []);
+        setChats([]);
       } catch (err) {
         console.error('Failed to fetch data', err);
       }
@@ -76,22 +73,19 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
   };
 
   const handleNewChat = async () => {
-    if (!activeWorkspaceId) return;
-    try {
-      const res = await axiosInstance.post('/api/chats', { workspaceId: activeWorkspaceId });
-      setActiveChatId(res.data._id);
-      navigate(`/chat/${res.data._id}`);
-    } catch (err) {
-      alert('Failed to create chat');
-    }
+    setActiveChatId(null);
+    navigate('/chat');
   };
 
   const currentWorkspace = workspaces.find(w => w._id === activeWorkspaceId);
+  const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+  const safeDocuments = Array.isArray(documents) ? documents : [];
+  const safeChats = Array.isArray(chats) ? chats : [];
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this document?')) {
       try {
-        await axiosInstance.delete(`/api/documents/${id}`);
+        await axiosInstance.delete(`/api/v1/documents/${id}`);
         setDocuments(prev => prev.filter(d => d._id !== id));
       } catch (err) {
         alert('Failed to delete document');
@@ -144,7 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
             {workspaceOpen && !collapsed && (
               <div className="absolute top-full left-0 w-full mt-1 glass-dropdown rounded-lg py-1 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="max-h-48 overflow-y-auto scrollbar-hide">
-                  {workspaces.map(ws => (
+                  {safeWorkspaces.map(ws => (
                     <button 
                       key={ws._id}
                       onClick={() => { setActiveWorkspaceId(ws._id); setWorkspaceOpen(false); }} 
@@ -201,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
           </button>
           {dataFilesOpen && !collapsed && (
             <ul className="space-y-1 text-white/70">
-              {documents.map((doc) => (
+              {safeDocuments.map((doc) => (
                 <li key={doc._id} className="group relative">
                   <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors text-[13px]">
                     <div className="flex items-center gap-3 overflow-hidden flex-1">
@@ -232,7 +226,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
           </button>
           {chatsOpen && !collapsed && (
             <div className="space-y-1">
-              {chats.map((chat) => (
+              {safeChats.map((chat) => (
                 <Link 
                   key={chat._id} 
                   to={`/chat/${chat._id}`}

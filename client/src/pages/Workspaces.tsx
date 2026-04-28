@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import axiosInstance from '../utils/axiosInstance';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 const Workspaces: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -9,6 +10,7 @@ const Workspaces: React.FC = () => {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const navigate = useNavigate();
+  const { activeWorkspaceId } = useWorkspace();
 
   const totalSteps = 5;
 
@@ -16,8 +18,13 @@ const Workspaces: React.FC = () => {
     if (step === 1) {
       if (!WorkspacesName.trim()) return alert('Please enter a workspace name');
       try {
-        const res = await axiosInstance.post('/api/workspaces', { name: WorkspacesName });
-        setWorkspaceId(res.data._id);
+        const res = await axiosInstance.post('/api/v1/workspaces', { name: WorkspacesName });
+        const createdWorkspace = res.data?.workspace || res.data;
+        if (!createdWorkspace?._id) {
+          alert('Failed to create workspace');
+          return;
+        }
+        setWorkspaceId(createdWorkspace._id);
         setStep(2);
       } catch (err) {
         alert('Failed to create workspace');
@@ -47,17 +54,19 @@ const Workspaces: React.FC = () => {
     }, 50);
   };
 
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = async (file: File) => {
   try {
+    const effectiveWorkspaceId = workspaceId || activeWorkspaceId;
+    if (!effectiveWorkspaceId) {
+      alert('Please create or select a workspace before uploading.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('document', file);
-    if (workspaceId) formData.append('workspaceId', workspaceId);
+    formData.append('workspaceId', effectiveWorkspaceId);
 
-    const res = await axiosInstance.post('/api/documents/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const res = await axiosInstance.post('/api/v1/documents/upload', formData);
 
     const documentId = res.data.documentId;
 
@@ -65,7 +74,7 @@ const Workspaces: React.FC = () => {
 
   } catch (error) {
     console.error(error);
-    alert('Upload failed');
+    alert(error?.response?.data?.error || 'Upload failed');
   }
 };
 
