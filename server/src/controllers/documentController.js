@@ -84,13 +84,46 @@ export const handleDeleteDocument = async (req, res) => {
   }
 };
 
+export const handleCancelUpload = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const document = await Document.findOne({ _id: req.params.id, userId });
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Reuse deletion logic
+    await deleteDocument(req.params.id);
+    
+    logger.info('Upload cancelled and document removed', { documentId: req.params.id, userId });
+    res.json({ success: true, message: 'Upload cancelled and data removed' });
+  } catch (error) {
+    logger.error('Cancel Upload Error', { error: error.message });
+    res.status(500).json({ error: 'Failed to cancel upload' });
+  }
+};
+
 export const chatWithDocument = async (req, res) => {
   try {
-    const { question, documentId: bodyDocumentId } = req.body;
+    const { question, documentId: bodyDocumentId, workspaceId } = req.body;
     const documentId = req.params.id || bodyDocumentId;
     const userId = req.user?.id;
 
-    const result = await processChatFlow(question, documentId, userId);
+    let targetDocumentIds = [];
+    if (workspaceId) {
+      // If workspaceId is provided, fetch all completed documents in this workspace
+      const docs = await Document.find({ workspaceId, userId, status: 'completed' }).select('_id');
+      targetDocumentIds = docs.map(d => d._id.toString());
+    } else if (documentId) {
+      targetDocumentIds = [documentId];
+    }
+
+    if (targetDocumentIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'No documents available to query.' });
+    }
+
+    const result = await processChatFlow(question, targetDocumentIds, userId, { workspaceId });
     res.json(result);
   } catch (error) {
     logger.error('Chat Error', { error: error.message });

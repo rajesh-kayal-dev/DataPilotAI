@@ -13,7 +13,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ buttonText, isSignu
 
   const handleSuccess = async (credentialResponse) => {
     try {
-      const response = await axiosInstance.post('/api/auth/google', {
+      const response = await axiosInstance.post('/auth/google', {
         token: credentialResponse.credential
       });
 

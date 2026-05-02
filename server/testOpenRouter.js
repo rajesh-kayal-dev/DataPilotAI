@@ -38,13 +38,47 @@ const testModel = async (name, modelId) => {
   }
 };
 
+const testEmbedModel = async () => {
+  const modelId = process.env.EMBED_MODEL;
+  process.stdout.write(`  EMBED (${modelId})... `);
+  try {
+    const res = await axios.post(
+      `${BASE_URL}/embeddings`,
+      {
+        model: modelId,
+        input: 'Test string for embedding',
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://datapilot.ai',
+          'X-Title': 'DataPilot AI',
+        },
+        timeout: 30000,
+      }
+    );
+    const hasEmbedding = res.data?.data?.[0]?.embedding?.length > 0;
+    if (hasEmbedding) {
+      console.log(`✅ OK (Dimension: ${res.data.data[0].embedding.length})`);
+    } else {
+      console.log(`❌ Embedding data missing`);
+    }
+  } catch (err) {
+    const detail = err.response?.data?.error?.message || err.message;
+    console.log(`❌ ${detail}`);
+  }
+};
+
 const run = async () => {
-  console.log('\n🔄 Testing all 3 OpenRouter models...\n');
+  console.log('\n🔄 Testing all OpenRouter models...\n');
   if (!API_KEY) { console.error('❌ OPENROUTER_API_KEY missing in .env'); process.exit(1); }
 
   for (const [name, id] of Object.entries(models)) {
     await testModel(name, id);
   }
+  
+  await testEmbedModel();
 
   console.log('\n✅ Done. Update .env model IDs to swap models anytime.\n');
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import axiosInstance from '../utils/axiosInstance';
+import type { Document } from '../types';
 
 const Dashboard: React.FC = () => {
   const [docCount, setDocCount] = useState(0);
@@ -9,10 +10,11 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const res = await axiosInstance.get('/api/v1/documents');
-        setDocCount(res.data.length);
+        const res = await axiosInstance.get('/documents');
+        const safeDocs = Array.isArray(res.data) ? res.data : [];
+        setDocCount(safeDocs.length);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch document count:', err);
       }
     };
     fetchDocs();

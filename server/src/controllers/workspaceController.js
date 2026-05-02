@@ -57,3 +57,27 @@ export const deleteWorkspace = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete workspace' });
   }
 };
+export const updateWorkspace = async (req, res) => {
+  try {
+    const { name } = req.body;
+    const userId = req.user?.id;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Workspace name is required' });
+    }
+
+    const workspace = await Workspace.findOneAndUpdate(
+      { _id: req.params.id, user: userId },
+      { name },
+      { new: true }
+    );
+
+    if (!workspace) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    res.json({ success: true, workspace });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update workspace' });
+  }
+};

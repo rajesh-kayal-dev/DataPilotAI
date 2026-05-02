@@ -1,43 +1,52 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL,
+  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/v1`,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// Add a request interceptor to attach the token
+// Request interceptor
 axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    // As per instruction: Use key: token
+    config.headers['token'] = token;
+    // Also include standard Authorization header just in case
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   if (config.data instanceof FormData) {
-    // Let the browser set multipart boundaries for file uploads
     if (config.headers) {
       delete (config.headers as any)['Content-Type'];
     }
   }
 
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   return config;
 });
 
+// Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Normalize error message
+    const message = error.response?.data?.message || error.response?.data?.error || error.message || 'An unexpected error occurred';
+    
     if (error?.response?.status === 401) {
-      const hasToken = Boolean(localStorage.getItem('token'));
-      const authPaths = ['/login', '/signup'];
-      const isOnAuthPage = authPaths.includes(window.location.pathname);
-
       localStorage.removeItem('token');
-      if (hasToken && !isOnAuthPage) {
+      if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
-    return Promise.reject(error);
+    
+    // Create a normalized error object
+    const normalizedError = new Error(message);
+    (normalizedError as any).status = error.response?.status;
+    (normalizedError as any).data = error.response?.data;
+    
+    return Promise.reject(normalizedError);
   }
 );
 

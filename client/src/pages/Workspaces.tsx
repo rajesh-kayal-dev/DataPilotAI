@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import axiosInstance from '../utils/axiosInstance';
 import { useWorkspace } from '../context/WorkspaceContext';
+import type { Workspace } from '../types';
 
 const Workspaces: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -10,27 +11,13 @@ const Workspaces: React.FC = () => {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const navigate = useNavigate();
-  const { activeWorkspaceId } = useWorkspace();
+  const { workspaces, activeWorkspaceId, createWorkspace, setActiveWorkspaceId, refreshDocuments } = useWorkspace();
 
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   const handleNext = async () => {
-    if (step === 1) {
-      if (!WorkspacesName.trim()) return alert('Please enter a workspace name');
-      try {
-        const res = await axiosInstance.post('/api/v1/workspaces', { name: WorkspacesName });
-        const createdWorkspace = res.data?.workspace || res.data;
-        if (!createdWorkspace?._id) {
-          alert('Failed to create workspace');
-          return;
-        }
-        setWorkspaceId(createdWorkspace._id);
-        setStep(2);
-      } catch (err) {
-        alert('Failed to create workspace');
-      }
-    } else if (step < totalSteps) {
-      if (step === 3) {
+    if (step < totalSteps) {
+      if (step === 2) {
         simulateProcessing();
       } else {
         setStep(step + 1);
@@ -49,34 +36,37 @@ const Workspaces: React.FC = () => {
       setProgress(currentProgress);
       if (currentProgress >= 100) {
         clearInterval(interval);
-        setTimeout(() => setStep(5), 500);
+        setTimeout(() => setStep(4), 500);
       }
     }, 50);
   };
 
   const handleFileUpload = async (file: File) => {
-  try {
-    const effectiveWorkspaceId = workspaceId || activeWorkspaceId;
-    if (!effectiveWorkspaceId) {
-      alert('Please create or select a workspace before uploading.');
-      return;
+    try {
+      const effectiveWorkspaceId = workspaceId || activeWorkspaceId;
+      if (!effectiveWorkspaceId) {
+        console.error('No workspace selected for upload');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('workspaceId', effectiveWorkspaceId);
+
+      const res = await axiosInstance.post('/documents/upload', formData);
+      const documentId = res.data.documentId || res.data._id;
+
+      if (documentId) {
+        await refreshDocuments(); // Refresh context state
+        navigate(`/processing/${documentId}`);
+      } else {
+        console.error('Upload failed: No document ID returned');
+      }
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
     }
-
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('workspaceId', effectiveWorkspaceId);
-
-    const res = await axiosInstance.post('/api/v1/documents/upload', formData);
-
-    const documentId = res.data.documentId;
-
-    navigate(`/processing/${documentId}`);
-
-  } catch (error) {
-    console.error(error);
-    alert(error?.response?.data?.error || 'Upload failed');
-  }
-};
+  };
 
   const applyChip = (name: string) => {
     setWorkspacesName(name);
@@ -89,50 +79,7 @@ const Workspaces: React.FC = () => {
           <div className="step-panel visible">
             <div className="card-body p-8 md:p-10">
               <div className="step-meta mb-7">
-                <div className="step-pill">Step 1 of 5</div>
-              </div>
-              <h2 className="font-display font-bold text-2xl text-white mb-2">Name your Workspaces</h2>
-              <p className="text-[#6B5F80] text-sm mb-8">Pick something that represents this collection of documents.</p>
-
-              <input
-                type="text"
-                value={WorkspacesName}
-                onChange={(e) => setWorkspacesName(e.target.value)}
-                placeholder="My Workspaces"
-                maxLength={48}
-                className="w-full bg-transparent border-b border-[#352B44] py-3 text-2xl font-display font-semibold text-white outline-none focus:border-[#7C4FD4] transition-colors placeholder-[#352B44]"
-              />
-
-              <div className="mt-8">
-                <div className="text-xs text-[#352B44] uppercase tracking-wider mb-3">Quick start with</div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { name: 'Finance Analysis', icon: '' },
-                    { name: 'Legal Docs', icon: '' },
-                    { name: 'Research Papers', icon: '' },
-                    { name: 'Product Docs', icon: '' },
-                    { name: 'HR & People', icon: '' },
-                  ].map((chip) => (
-                    <button
-                      key={chip.name}
-                      onClick={() => applyChip(chip.name)}
-                      className="px-4 py-2 rounded-full bg-white/5 border border-[rgba(124,79,212,0.13)] text-[#6B5F80] text-sm hover:border-[rgba(124,79,212,0.45)] hover:text-white hover:bg-[rgba(124,79,212,0.1)] transition-all"
-                    >
-                      {chip.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="step-panel visible">
-            <div className="card-body p-8 md:p-10">
-              <div className="step-meta mb-7">
-                <div className="step-pill">Step 2 of 5</div>
+                <div className="step-pill">Step 1 of 4</div>
               </div>
               <h2 className="font-display font-bold text-2xl text-white mb-2">Add your documents</h2>
               <p className="text-[#6B5F80] text-sm mb-6">Drop any PDFs, Word docs, or text files. You can always add more later.</p>
@@ -157,12 +104,12 @@ const Workspaces: React.FC = () => {
           </div>
         );
 
-      case 3:
+      case 2:
         return (
           <div className="step-panel visible">
             <div className="card-body p-8 md:p-10">
               <div className="step-meta mb-7">
-                <div className="step-pill">Step 3 of 5</div>
+                <div className="step-pill">Step 2 of 4</div>
               </div>
               <h2 className="font-display font-bold text-2xl text-white mb-2">How should we read it?</h2>
               <p className="text-[#6B5F80] text-sm mb-6">Choose how deeply the AI analyses your documents.</p>
@@ -201,12 +148,12 @@ const Workspaces: React.FC = () => {
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div className="step-panel visible">
             <div className="card-body p-8 md:p-10">
               <div className="step-meta mb-7">
-                <div className="step-pill">Step 4 of 5</div>
+                <div className="step-pill">Step 3 of 4</div>
               </div>
               <h2 className="font-display font-bold text-2xl text-white mb-2">Building your Workspaces...</h2>
               <p className="text-[#6B5F80] text-sm mb-8">Sit tight - your documents are being indexed.</p>
@@ -242,7 +189,7 @@ const Workspaces: React.FC = () => {
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div className="step-panel visible">
             <div className="card-body p-10 text-center relative overflow-hidden">
@@ -263,7 +210,7 @@ const Workspaces: React.FC = () => {
 
               <div className="flex justify-center gap-3 mb-8">
                 <div className="px-4 py-2 rounded-full bg-white/5 border border-[rgba(124,79,212,0.13)] text-sm text-[#6B5F80]">
-                  <span className="text-white font-semibold">{WorkspacesName || 'Workspaces'}</span> created
+                  <span className="text-white font-semibold">Workspace</span> created
                 </div>
                 <div className="px-4 py-2 rounded-full bg-white/5 border border-[rgba(124,79,212,0.13)] text-sm text-[#6B5F80]">
                   Documents <span className="text-white font-semibold">indexed</span>
@@ -326,7 +273,7 @@ const Workspaces: React.FC = () => {
               className="absolute top-1.5 left-0 h-px bg-gradient-to-r from-[#7C4FD4] to-[#4F8EF7] shadow-[0_0_8px_rgba(124,79,212,0.6)] transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
               style={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }}
             ></div>
-            {[1, 2, 3, 4, 5].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="relative z-10 flex flex-col items-center flex-1">
                 <div className={`w-3.5 h-3.5 rounded-full border transition-all duration-300 ${s < step ? 'border-[#7C4FD4] bg-gradient-to-br from-[#7C4FD4] to-[#4F8EF7] shadow-[0_0_10px_rgba(124,79,212,0.4)]' :
                   s === step ? 'border-[#7C4FD4] bg-[#7C4FD4] shadow-[0_0_0_4px_rgba(124,79,212,0.18),0_0_14px_rgba(124,79,212,0.5)] scale-125' :
@@ -337,7 +284,7 @@ const Workspaces: React.FC = () => {
                 </div>
                 <span className={`text-[11px] mt-2.5 transition-colors ${s === step ? 'text-[#C084FC] font-semibold' : s < step ? 'text-[#6B5F80]' : 'text-[#352B44]'
                   }`}>
-                  {s === 1 ? 'Info' : s === 2 ? 'Upload' : s === 3 ? 'Mode' : s === 4 ? 'Processing' : 'Ready'}
+                  {s === 1 ? 'Upload' : s === 2 ? 'Mode' : s === 3 ? 'Processing' : 'Ready'}
                 </span>
               </div>
             ))}
@@ -348,7 +295,7 @@ const Workspaces: React.FC = () => {
           <div className="h-0.5 bg-gradient-to-r from-[#7C4FD4] via-[#4F8EF7] to-[#C084FC]"></div>
           {renderStepContent()}
 
-          {step < 5 && step !== 4 && (
+          {step < 4 && step !== 3 && (
             <div className="flex items-center justify-between px-8 py-5 border-t border-[rgba(53,43,68,0.4)]">
               {step > 1 ? (
                 <button onClick={handlePrev} className="px-4 py-3 rounded-xl border border-[rgba(124,79,212,0.18)] text-[#6B5F80] text-sm hover:border-[rgba(124,79,212,0.38)] hover:text-white transition-all inline-flex items-center gap-1.5">
@@ -357,7 +304,7 @@ const Workspaces: React.FC = () => {
                 </button>
               ) : (
                 <button onClick={() => navigate('/dashboard')} className="text-xs text-[#352B44] hover:text-[#6B5F80] transition-colors underline underline-offset-2">
-                  Skip
+                  Cancel
                 </button>
               )}
               <button

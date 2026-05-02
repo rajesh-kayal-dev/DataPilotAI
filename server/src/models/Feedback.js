@@ -1,38 +1,35 @@
 import mongoose from 'mongoose';
 
-const feedbackSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    question: {
-      type: String,
-      required: true,
-    },
-    answer: {
-      type: String,
-      required: true,
-    },
-    rating: {
-      type: String,
-      enum: ['up', 'down'],
-      required: true,
-    },
-    model: {
-      type: String,
-    },
-    documentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Document',
-    },
+const feedbackSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  {
-    timestamps: true,
+  userName: {
+    type: String,
+    required: true
+  },
+  rating: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 5
+  },
+  type: {
+    type: String,
+    enum: ['issue', 'recommendation', 'other'],
+    default: 'other'
+  },
+  comment: {
+    type: String,
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-);
+});
 
 const Feedback = mongoose.model('Feedback', feedbackSchema);
-
 export default Feedback;

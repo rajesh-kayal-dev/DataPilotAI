@@ -7,22 +7,49 @@ export const MODEL_REGISTRY = [
   // =========================
 
   {
+    id: 'gpt-oss-120b',
+    label: 'GPT OSS 120B',
+    provider: 'OpenAI (OSS)',
+    model: 'openai/gpt-oss-120b:free',
+    type: 'free',
+    tier: 'top',
+    badge: 'Recommended',
+  },
+  {
     id: 'mimo-flash',
     label: 'MiMo V2 Flash',
     provider: 'Xiaomi',
     model: 'xiaomi/mimo-v2-flash',
     type: 'free',
     tier: 'top',
-    badge: 'Recommended',
+    badge: 'Popular',
   },
   {
     id: 'gemma-4b',
     label: 'Gemma 3 4B',
     provider: 'Google',
-    model: 'google/gemma-3-4b-it:free',
+    model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
     type: 'free',
     tier: 'top',
     badge: 'Free',
+  },
+  {
+    id: 'deepseek-r1-free',
+    label: 'DeepSeek R1',
+    provider: 'DeepSeek',
+    model: 'deepseek/deepseek-r1:free',
+    type: 'free',
+    tier: 'top',
+    badge: 'Reasoning',
+  },
+  {
+    id: 'llama-3-8b',
+    label: 'Llama 3 8B',
+    provider: 'Meta',
+    model: 'meta-llama/llama-3-8b-instruct:free',
+    type: 'free',
+    tier: 'fast',
+    badge: 'Fast',
   },
   {
     id: 'devstral',
@@ -48,13 +75,31 @@ export const MODEL_REGISTRY = [
   // =========================
 
   {
-    id: 'claude-haiku',
-    label: 'Claude Haiku',
-    provider: 'Anthropic',
-    model: 'anthropic/claude-haiku-4-5',
+    id: 'gpt-4o',
+    label: 'GPT-4o',
+    provider: 'OpenAI',
+    model: 'openai/gpt-4o',
     type: 'paid',
-    tier: 'fast',
+    tier: 'premium',
+    badge: 'Flagship',
+  },
+  {
+    id: 'gpt-4o-mini',
+    label: 'GPT-4o Mini',
+    provider: 'OpenAI',
+    model: 'openai/gpt-4o-mini',
+    type: 'paid',
+    tier: 'budget',
     badge: 'Fast',
+  },
+  {
+    id: 'claude-opus',
+    label: 'Claude Opus',
+    provider: 'Anthropic',
+    model: 'anthropic/claude-opus-4-6',
+    type: 'paid',
+    tier: 'premium',
+    badge: 'Powerful',
   },
   {
     id: 'claude-sonnet',
@@ -66,13 +111,13 @@ export const MODEL_REGISTRY = [
     badge: 'Best',
   },
   {
-    id: 'claude-opus',
-    label: 'Claude Opus',
-    provider: 'Anthropic',
-    model: 'anthropic/claude-opus-4-6',
+    id: 'deepseek-chat',
+    label: 'DeepSeek V3',
+    provider: 'DeepSeek',
+    model: 'deepseek/deepseek-chat',
     type: 'paid',
-    tier: 'premium',
-    badge: 'Powerful',
+    tier: 'balanced',
+    badge: 'Best',
   },
   {
     id: 'gemini-flash',
@@ -90,7 +135,7 @@ export const MODEL_REGISTRY = [
 // DEFAULT MODEL
 // =========================
 
-export const DEFAULT_MODEL_ID = 'mimo-flash';
+export const DEFAULT_MODEL_ID = 'gpt-oss-120b';
 
 // =========================
 // RESOLVE MODEL (SAFE)

@@ -19,11 +19,12 @@ export const generateAnswer = async (question, context, model, options = {}) => 
   }
 
   const apiAction = async () => {
+    const { isDocFound = true, hasDocuments = true, isGreeting = false } = options;
     const response = await axios.post(
       `${config.openrouter.baseUrl}/chat/completions`,
       {
         model: selectedModel,
-        messages: [{ role: 'user', content: buildRAGPrompt(context, question) }],
+        messages: [{ role: 'user', content: buildRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting) }],
         max_tokens: isFallback ? 150 : config.llm.maxTokens,
         temperature: config.llm.temperature,
         stream: !!onStream,
@@ -68,14 +69,31 @@ export const generateAnswer = async (question, context, model, options = {}) => 
     return { success: true, answer, model: selectedModel };
   };
 
-  const fallbackHandler = async () => {
+  const fallbackHandler = async (err) => {
+    const errorMsg = err?.message || 'Circuit Breaker OPEN';
+    const errorResponse = err?.response?.data || null;
+
     if (!isFallback) {
-      logger.warn('LLM Failure - Using Fallback', { model: selectedModel });
-      return await generateAnswer(question, context, config.openrouter.fallbackModel, { 
+      logger.warn('LLM Failure - Using Fallback', { 
+        model: selectedModel, 
+        errorMessage: errorMsg,
+        response: errorResponse 
+      });
+      if (options.onStream) {
+        options.onStream(`*Note: Your selected model (${selectedModel}) is currently unavailable. I am answering using a recommended backup model (${config.openrouter.fallbackModel}).*\n\n`);
+      }
+      
+      const fallbackResult = await generateAnswer(question, context, config.openrouter.fallbackModel, { 
+        ...options,
         isFallback: true, 
         retryCount: retryCount + 1 
       });
+      if (fallbackResult.success && !options.onStream) {
+        fallbackResult.answer = `*Note: Your selected model (${selectedModel}) is currently unavailable. I am answering using a recommended backup model (${config.openrouter.fallbackModel}).*\n\n${fallbackResult.answer}`;
+      }
+      return fallbackResult;
     }
+    logger.error('Fallback Model Failed', { errorMessage: errorMsg });
     return { success: false, error: 'System busy, please try again.', model: selectedModel };
   };
 

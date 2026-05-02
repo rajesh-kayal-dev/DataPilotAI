@@ -10,6 +10,7 @@ import modelRoutes from './routes/modelRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import workspaceRoutes from './routes/workspaceRoutes.js';
+import googleAuthRoutes from './routes/googleAuthRoutes.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -39,6 +40,7 @@ app.use(`${API_V1}/chat`, chatRoutes);
 app.use(`${API_V1}/models`, modelRoutes);
 app.use(`${API_V1}/feedback`, feedbackRoutes);
 app.use(`${API_V1}/admin`, adminRoutes);
+app.use(`${API_V1}`, googleAuthRoutes);
 
 /**
  * Global Error Handler

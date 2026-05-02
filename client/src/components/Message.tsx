@@ -5,15 +5,18 @@ interface MessageProps {
   role: 'user' | 'assistant';
   content: string;
   source?: string;
+  animate?: boolean;
 }
 
-const Message: React.FC<MessageProps> = ({ role, content, source }) => {
-  const [isTyping, setIsTyping] = useState(role === 'assistant');
+const Message: React.FC<MessageProps> = ({ role, content, source, animate = false }) => {
+  const [isTyping, setIsTyping] = useState(role === 'assistant' && animate);
   const [displayedText, setDisplayedText] = useState('');
-  const [showActions, setShowActions] = useState(false);
+  const [showActions, setShowActions] = useState(!animate);
 
   useEffect(() => {
-    if (role === 'assistant') {
+    if (role === 'assistant' && animate) {
+      setIsTyping(true);
+      setShowActions(false);
       let index = 0;
       const interval = setInterval(() => {
         if (index < content.length) {
@@ -29,8 +32,9 @@ const Message: React.FC<MessageProps> = ({ role, content, source }) => {
     } else {
       setDisplayedText(content);
       setIsTyping(false);
+      setShowActions(true);
     }
-  }, [content, role]);
+  }, [content, role, animate]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);

@@ -13,9 +13,12 @@ import User from '../models/User.js';
  * Orchestrator (Production V6)
  * Uses RAG_MODE to control strict vs hybrid answering behavior.
  */
-export const processChatFlow = async (question, documentId, userId, options = {}) => {
+export const processChatFlow = async (question, documentIds, userId, options = {}) => {
   const startTime = Date.now();
-  const { onStream } = options;
+  const { onStream, workspaceId } = options;
+
+  // Ensure documentIds is an array
+  const docIdsArray = Array.isArray(documentIds) ? documentIds : (documentIds ? [documentIds] : []);
 
   try {
     // 1. Rate Limiting & Daily Quota
@@ -23,7 +26,7 @@ export const processChatFlow = async (question, documentId, userId, options = {}
     if (!rateLimit.allowed) return { success: false, error: rateLimit.message };
 
     // 2. Caching (Production Only)
-    const cacheKey = getCacheKey(question, documentId);
+    const cacheKey = getCacheKey(question, docIdsArray.join(','));
     if (!onStream && config.env === 'production') {
       const cached = await getCachedResponse(cacheKey);
       if (cached) return { ...cached, cached: true, responseTime: Date.now() - startTime };
@@ -31,13 +34,36 @@ export const processChatFlow = async (question, documentId, userId, options = {}
 
     // 3. Intent Detection
     const intent = detectIntent(question);
-    if (intent === 'greeting') {
-      return { success: true, answer: "Hello! I'm DataPilot AI. How can I help you today?", model: 'system', source: 'Internal' };
+    
+    if (intent === 'workspace_info' && workspaceId) {
+      try {
+        const Workspace = (await import('../models/Workspace.js')).default;
+        const ws = await Workspace.findById(workspaceId);
+        if (ws) {
+          return { success: true, answer: `You are currently in the workspace: "${ws.name}".`, model: 'system', source: 'Internal' };
+        }
+      } catch (err) {
+        logger.error('Workspace Info Error', { err });
+      }
     }
 
     // 4. Retrieval & Scoring
-    const { context, confidence, alignment, isReliable, chunks } = 
-      await retrieveContext(question, documentId, intent === 'doc_summary');
+    let context = '';
+    let confidence = 0;
+    let alignment = 0;
+    let isReliable = false;
+    let chunks = [];
+
+    const hasDocuments = docIdsArray.length > 0;
+
+    if (hasDocuments) {
+      const retrievalResult = await retrieveContext(question, docIdsArray, intent === 'doc_summary');
+      context = retrievalResult.context;
+      confidence = retrievalResult.confidence;
+      alignment = retrievalResult.alignment;
+      isReliable = retrievalResult.isReliable;
+      chunks = retrievalResult.chunks;
+    }
 
     // 5. RAG Mode Logic (Strict vs Hybrid)
     const isStrict = config.rag.mode === 'strict';
@@ -71,7 +97,13 @@ export const processChatFlow = async (question, documentId, userId, options = {}
     }
 
     // 7. Generation
-    const result = await generateAnswer(question, context, modelId, { onStream, userId });
+    const result = await generateAnswer(question, context, modelId, { 
+      onStream, 
+      userId,
+      isDocFound: intent === 'doc_summary' || isReliable,
+      hasDocuments,
+      isGreeting: intent === 'greeting'
+    });
 
     // 8. Result Packaging
     const responseTime = Date.now() - startTime;
@@ -90,7 +122,11 @@ export const processChatFlow = async (question, documentId, userId, options = {}
     // 9. Post-Processing
     if (result.success) {
       await trackMetrics(userId, { ...finalPayload, tokens: question.length + (result.answer?.length || 0) });
-      if (!onStream) await setCachedResponse(cacheKey, finalPayload);
+      
+      // Do not cache the LLM response for summaries/meta queries so it responds differently every time
+      if (!onStream && intent !== 'doc_summary') {
+        await setCachedResponse(cacheKey, finalPayload);
+      }
     }
 
     return finalPayload;

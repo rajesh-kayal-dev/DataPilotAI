@@ -4,19 +4,8 @@ import Logo from './Logo';
 import { logout } from '../utils/auth';
 import axiosInstance from '../utils/axiosInstance';
 import { useWorkspace } from '../context/WorkspaceContext';
-import ModelSelector from './ModelSelector';
-
-interface Document {
-  _id: string;
-  name: string;
-  status: string;
-  size: number;
-}
-
-interface Chat {
-  _id: string;
-  title: string;
-}
+import FeedbackModal from './FeedbackModal';
+import { toast } from 'react-hot-toast';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -27,258 +16,508 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
   const navigate = useNavigate();
   const { 
     workspaces, 
+    documents,
+    chats,
     activeWorkspaceId, 
+    activeChatId,
     setActiveWorkspaceId, 
-    activeChatId, 
     setActiveChatId,
-    createWorkspace 
+    refreshDocuments,
+    refreshChats,
+    createWorkspace,
+    updateWorkspace,
+    deleteWorkspace
   } = useWorkspace();
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(true);
   const [dataFilesOpen, setDataFilesOpen] = useState(true);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [chats, setChats] = useState<Chat[]>([]);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
+  const [editWorkspaceName, setEditWorkspaceName] = useState('');
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editChatTitle, setEditChatTitle] = useState('');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [isHealthy, setIsHealthy] = useState(true);
+
+  const handleUpdateChat = async (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (!editChatTitle.trim()) return;
+    try {
+      await axiosInstance.patch(`/chat/sessions/${id}`, { title: editChatTitle });
+      setEditingChatId(null);
+      setEditChatTitle('');
+      refreshChats();
+    } catch (err) {
+      console.error('Failed to update chat', err);
+      toast.error('Failed to update chat');
+    }
+  };
+
+  const handleDeleteChat = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this chat?')) {
+      try {
+        await axiosInstance.delete(`/chat/sessions/${id}`);
+        toast.success('Chat deleted');
+        if (activeChatId === id) {
+          navigate(`/chat/${activeWorkspaceId}`);
+        }
+        refreshChats();
+      } catch (err) {
+        console.error('Failed to delete chat', err);
+        toast.error('Failed to delete chat');
+      }
+    }
+  };
 
   useEffect(() => {
-    const fetchDocsAndChats = async () => {
-      if (!activeWorkspaceId) return;
+    const checkHealth = async () => {
       try {
-        const docRes = await axiosInstance.get(`/api/v1/documents?workspaceId=${activeWorkspaceId}`);
-        setDocuments(Array.isArray(docRes.data) ? docRes.data : []);
-        setChats([]);
-      } catch (err) {
-        console.error('Failed to fetch data', err);
+        const res = await axiosInstance.get(`${import.meta.env.VITE_BACKEND_URL}/api/health`);
+        setIsHealthy(res.data?.status === 'healthy' || res.data?.status === 'degraded');
+      } catch {
+        setIsHealthy(false);
       }
     };
-    fetchDocsAndChats();
-    const interval = setInterval(fetchDocsAndChats, 5000);
+    checkHealth();
+    const interval = setInterval(checkHealth, 60000); // 60s
     return () => clearInterval(interval);
-  }, [activeWorkspaceId]);
+  }, []);
+
+  const handleDeleteWorkspace = async (id: string) => {
+    if (window.confirm('Delete this workspace and all its documents?')) {
+      try {
+        await deleteWorkspace(id);
+        setWorkspaceOpen(false);
+      } catch (err) {
+        console.error('Failed to delete workspace', err);
+      }
+    }
+  };
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
     try {
-      const ws = await createWorkspace(newWorkspaceName);
+      await createWorkspace(newWorkspaceName);
       setNewWorkspaceName('');
       setIsCreatingWorkspace(false);
       setWorkspaceOpen(false);
     } catch (err) {
-      alert('Failed to create workspace');
+      console.error('Failed to create workspace', err);
     }
   };
 
-  const handleNewChat = async () => {
+  const handleUpdateWorkspace = async (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (!editWorkspaceName.trim()) return;
+    try {
+      await updateWorkspace(id, editWorkspaceName);
+      setEditingWorkspaceId(null);
+      setEditWorkspaceName('');
+    } catch (err) {
+      console.error('Failed to update workspace', err);
+    }
+  };
+
+  const handleNewChat = () => {
     setActiveChatId(null);
     navigate('/chat');
   };
 
-  const currentWorkspace = workspaces.find(w => w._id === activeWorkspaceId);
   const safeWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+  const currentWorkspace = safeWorkspaces.find(w => w._id === activeWorkspaceId);
   const safeDocuments = Array.isArray(documents) ? documents : [];
-  const safeChats = Array.isArray(chats) ? chats : [];
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteDoc = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this document?')) {
       try {
-        await axiosInstance.delete(`/api/v1/documents/${id}`);
+        await axiosInstance.delete(`/documents/${id}`);
         setDocuments(prev => prev.filter(d => d._id !== id));
+        toast.success('Document has been deleted');
       } catch (err) {
-        alert('Failed to delete document');
+        console.error('Failed to delete document', err);
+        toast.error('Failed to delete document');
       }
     }
   };
 
-  const recentChats = [
-    { id: 1, title: 'React Hooks Mastery', pinned: true },
-    { id: 2, title: 'JavaScript Interview Concepts' },
-    { id: 3, title: 'Docker Presentation Script' },
-    { id: 4, title: 'Docker Notes for Beginners' },
-    { id: 5, title: 'Desktop Layout Optimization' },
-  ];
-
   return (
-    <aside className={`${collapsed ? 'w-[68px]' : 'w-64'} h-full shrink-0 flex flex-col glass-panel z-30 relative transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
-
-      <div className="h-16 px-4 flex items-center justify-between border-b border-white/5 shrink-0">
-        {collapsed ? (
-          <button onClick={onToggle} className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors shrink-0">
-            <Logo variant="icon" size="sm" />
-          </button>
-        ) : (
+    <aside className={`h-full shrink-0 flex flex-col glass-panel z-30 relative transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${collapsed ? 'w-[80px]' : 'w-64'}`}>
+      
+      {/* Header */}
+      <div className="p-4 flex items-center justify-between border-b border-white/5 h-16 shrink-0">
+        {!collapsed ? (
           <>
             <Link to="/dashboard" className="flex items-center gap-3 overflow-hidden">
               <Logo variant="full" size="lg" className="shrink-0" />
+              <div className="flex items-center gap-1.5 ml-1">
+                <div className={`w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`}></div>
+                <span className="text-[9px] text-white/30 uppercase font-bold tracking-tighter">
+                  {isHealthy ? 'API Live' : 'API Down'}
+                </span>
+              </div>
             </Link>
             <button onClick={onToggle} className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors shrink-0 ml-auto">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
             </button>
           </>
+        ) : (
+          <button onClick={onToggle} className="mx-auto p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+            <Logo variant="icon" size="sm" />
+          </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto flex flex-col mt-4 gap-5 pb-4">
-
-        <div className="px-3">
-          <h3 className={`text-[10px] uppercase tracking-wider text-white/40 mb-2 px-1 font-semibold ${collapsed ? 'hidden' : ''}`}>Workspace</h3>
-          <div className="relative">
-            <button onClick={() => setWorkspaceOpen(!workspaceOpen)} className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-brand/20 text-brand flex items-center justify-center text-[10px] font-bold shrink-0">
-                  {currentWorkspace?.name?.[0] || 'W'}
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide space-y-6">
+        
+        {/* Workspace Selector */}
+        {!collapsed && (
+          <div>
+            <div className="px-3 mb-2 flex items-center justify-between">
+              <h3 className="text-[10px] uppercase tracking-wider text-white/30 font-bold">Workspace</h3>
+              <span className="text-[9px] bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-white/40">{safeWorkspaces.length}</span>
+            </div>
+            <div className="relative">
+              <button 
+                onClick={() => setWorkspaceOpen(!workspaceOpen)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-left overflow-hidden"
+              >
+                <div className="w-5 h-5 rounded bg-brand/20 flex items-center justify-center font-bold text-[10px] text-brand shrink-0">
+                  {currentWorkspace?.name[0] || 'T'}
                 </div>
-                {!collapsed && <span className="font-medium text-[13px] text-white/90 whitespace-nowrap">{currentWorkspace?.name || 'Select Workspace'}</span>}
-              </div>
-              {!collapsed && <svg className={`w-3.5 h-3.5 text-white/50 shrink-0 transition-transform ${workspaceOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>}
-            </button>
-            {workspaceOpen && !collapsed && (
-              <div className="absolute top-full left-0 w-full mt-1 glass-dropdown rounded-lg py-1 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="max-h-48 overflow-y-auto scrollbar-hide">
-                  {safeWorkspaces.map(ws => (
+                <span className="font-medium text-[13px] text-white/90 truncate">{currentWorkspace?.name || 'Select Workspace'}</span>
+                <svg className={`w-4 h-4 ml-auto text-white/30 transition-transform ${workspaceOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {workspaceOpen && (
+                <div className="absolute top-full left-0 w-full mt-2 glass-dropdown rounded-xl py-2 z-[100] shadow-2xl border border-white/10 overflow-visible">
+                  <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                    {safeWorkspaces.length === 0 && (
+                      <div className="px-4 py-3 text-xs text-white/40 text-center">No workspaces found</div>
+                    )}
+                    {safeWorkspaces.map(ws => (
+                      <div 
+                        key={ws._id}
+                        className={`group w-full text-left px-4 py-2.5 text-xs flex items-center justify-between cursor-pointer transition-all ${activeWorkspaceId === ws._id ? 'text-brand bg-white/5' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                        onClick={() => {
+                          if (editingWorkspaceId !== ws._id) {
+                            setActiveWorkspaceId(ws._id); 
+                            setWorkspaceOpen(false);
+                            // Navigate to chat for this specific workspace
+                            navigate(`/chat/${ws._id}`);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden flex-1">
+                          <div className={`w-4 h-4 rounded flex items-center justify-center font-bold shrink-0 ${activeWorkspaceId === ws._id ? 'bg-brand/20' : 'bg-white/10'}`}>
+                            {ws.name[0]}
+                          </div> 
+                          {editingWorkspaceId === ws._id ? (
+                            <form onSubmit={(e) => handleUpdateWorkspace(e, ws._id)} className="flex-1 flex gap-1">
+                              <input 
+                                autoFocus
+                                type="text"
+                                value={editWorkspaceName}
+                                onChange={(e) => setEditWorkspaceName(e.target.value)}
+                                className="w-full bg-white/5 border border-white/20 rounded px-1 py-0.5 text-xs text-white outline-none"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </form>
+                          ) : (
+                            <span className="truncate">{ws.name}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {editingWorkspaceId === ws._id ? (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setEditingWorkspaceId(null); }}
+                              className="p-1 hover:text-white transition-all text-white/40"
+                              title="Cancel"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          ) : (
+                            <>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingWorkspaceId(ws._id);
+                                  setEditWorkspaceName(ws.name);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-brand transition-all text-white/40"
+                                title="Rename"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              {safeWorkspaces.length > 1 && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteWorkspace(ws._id);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all text-white/40"
+                                  title="Delete"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {isCreatingWorkspace ? (
+                    <form onSubmit={handleCreateWorkspace} className="p-2 border-t border-white/10 mt-1">
+                      <input 
+                        autoFocus
+                        type="text" 
+                        value={newWorkspaceName}
+                        onChange={(e) => setNewWorkspaceName(e.target.value)}
+                        placeholder="Workspace name..."
+                        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-brand/50 mb-2"
+                      />
+                      <div className="flex gap-1">
+                        <button type="submit" className="flex-1 bg-brand text-white text-[10px] py-1 rounded">Create</button>
+                        <button type="button" onClick={() => setIsCreatingWorkspace(false)} className="px-2 py-1 text-[10px] text-white/50 hover:text-white">Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
                     <button 
-                      key={ws._id}
-                      onClick={() => { setActiveWorkspaceId(ws._id); setWorkspaceOpen(false); }} 
-                      className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${activeWorkspaceId === ws._id ? 'text-brand bg-white/5' : 'text-white/80 hover:bg-white/10'}`}
+                      onClick={() => setIsCreatingWorkspace(true)} 
+                      className="w-full text-left px-3 py-2 text-xs text-white/50 hover:text-white hover:bg-white/10 flex items-center gap-2 border-t border-white/10 mt-1 pt-2"
                     >
-                      <div className={`w-4 h-4 rounded flex items-center justify-center font-bold ${activeWorkspaceId === ws._id ? 'bg-brand/20' : 'bg-white/10'}`}>
-                        {ws.name[0]}
-                      </div> 
-                      <span className="truncate">{ws.name}</span>
+                      <svg className="w-4 h-4 text-brand shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                      Add new workspace
                     </button>
-                  ))}
+                  )}
                 </div>
-                
-                {isCreatingWorkspace ? (
-                  <form onSubmit={handleCreateWorkspace} className="p-2 border-t border-white/10 mt-1">
-                    <input 
-                      autoFocus
-                      type="text" 
-                      value={newWorkspaceName}
-                      onChange={(e) => setNewWorkspaceName(e.target.value)}
-                      placeholder="Workspace name..."
-                      className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-brand/50 mb-2"
-                    />
-                    <div className="flex gap-1">
-                      <button type="submit" className="flex-1 bg-brand text-white text-[10px] py-1 rounded">Create</button>
-                      <button type="button" onClick={() => setIsCreatingWorkspace(false)} className="px-2 py-1 text-[10px] text-white/50 hover:text-white">Cancel</button>
-                    </div>
-                  </form>
-                ) : (
-                  <button onClick={() => setIsCreatingWorkspace(true)} className="w-full text-left px-3 py-2 text-xs text-white/50 hover:text-white hover:bg-white/10 flex items-center gap-2 border-t border-white/10 mt-1 pt-2">
-                    <svg className="w-4 h-4 text-brand shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                    Add new workspace
-                  </button>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="px-3">
+        {/* Action Button */}
+        <div>
           <button 
             onClick={handleNewChat}
-            className="w-full bg-white/10 hover:bg-white/15 border border-white/5 transition-colors text-white py-2 px-4 rounded-xl flex items-center gap-3 text-sm font-medium"
+            className={`w-full bg-white/10 hover:bg-white/15 border border-white/5 transition-all text-white py-2.5 px-4 rounded-xl flex items-center ${collapsed ? 'justify-center' : 'gap-3'} text-sm font-medium`}
           >
             <svg className="w-4 h-4 text-white/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
             {!collapsed && <span className="whitespace-nowrap">New Chat</span>}
           </button>
         </div>
 
-        <div className="px-3">
-          <button onClick={() => setDataFilesOpen(!dataFilesOpen)} className={`w-full flex items-center justify-between mb-2 px-1 ${collapsed ? 'hidden' : ''}`}>
-            <h3 className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">Data & Files</h3>
-            <svg className={`w-3 h-3 text-white/40 transition-transform ${dataFilesOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-          </button>
-          {dataFilesOpen && !collapsed && (
-            <ul className="space-y-1 text-white/70">
-              {safeDocuments.map((doc) => (
-                <li key={doc._id} className="group relative">
-                  <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors text-[13px]">
-                    <div className="flex items-center gap-3 overflow-hidden flex-1">
-                      <svg className={`w-4 h-4 shrink-0 ${doc.status === 'ready' ? 'text-green-400' : 'text-yellow-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Documents Section */}
+        <div>
+          {!collapsed && (
+            <button 
+              onClick={() => setDataFilesOpen(!dataFilesOpen)} 
+              className="w-full flex items-center justify-between mb-2 px-1 mt-4"
+            >
+              <h3 className="text-[10px] uppercase tracking-wider text-white/40 font-bold">Data & Files</h3>
+              <svg className={`w-3 h-3 text-white/40 transition-transform ${dataFilesOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          )}
+          
+          {(dataFilesOpen || collapsed) && (
+            <div className="space-y-1">
+              {documents.length === 0 ? !collapsed && (
+                <div className="px-2 py-3 text-[10px] text-white/20 text-center border border-dashed border-white/5 rounded-lg">
+                  No documents
+                </div>
+              ) : documents.map((doc) => (
+                <div key={doc._id} className="group relative">
+                  <div className={`flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors ${collapsed ? 'justify-center' : ''}`}>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <svg className={`w-4 h-4 shrink-0 ${doc.status === 'ready' || doc.status === 'completed' || doc.status === 'success' ? 'text-green-400' : 'text-yellow-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span className="truncate">{doc.name}</span>
+                      {!collapsed && <span className="text-sm text-white/70 truncate">{doc.name}</span>}
                     </div>
-                    <button 
-                      onClick={() => handleDelete(doc._id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
-                      title="Delete document"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    {!collapsed && (
+                      <button 
+                        onClick={() => handleDeleteDoc(doc._id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
                   </div>
-                </li>
+                </div>
               ))}
-              <li><Link to="/workspaces" className="flex items-center gap-3 p-2 rounded-lg hover:bg-brand/10 text-brand text-[13px] border border-dashed border-brand/20 mt-2"><svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg> <span className="whitespace-nowrap">Upload New</span></Link></li>
-            </ul>
-          )}
-        </div>
-
-        <div className="px-3">
-          <button onClick={() => setChatsOpen(!chatsOpen)} className={`w-full flex items-center justify-between mb-2 px-1 ${collapsed ? 'hidden' : ''}`}>
-            <h3 className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">Chats</h3>
-            <svg className={`w-3 h-3 text-white/40 transition-transform ${chatsOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-          </button>
-          {chatsOpen && !collapsed && (
-            <div className="space-y-1">
-              {safeChats.map((chat) => (
-                <Link 
-                  key={chat._id} 
-                  to={`/chat/${chat._id}`}
-                  onClick={() => setActiveChatId(chat._id)}
-                  className={`flex items-center justify-between p-2 rounded-lg transition-colors text-[13px] ${activeChatId === chat._id ? 'bg-brand/10 text-brand border border-brand/20' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <svg className="w-3.5 h-3.5 shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-                    <span className="truncate">{chat.title}</span>
-                  </div>
-                </Link>
-              ))}
+              {!collapsed && (
+                <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-brand/10 text-brand text-xs border border-dashed border-brand/20 mt-2 cursor-pointer transition-colors">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                  <span>Upload New</span>
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !activeWorkspaceId) return;
+                      const toastId = toast.loading('Uploading document...');
+                      try {
+                        const formData = new FormData();
+                        formData.append('document', file);
+                        formData.append('workspaceId', activeWorkspaceId);
+                        await axiosInstance.post('/documents/upload', formData);
+                        toast.success('Document uploaded and processing started', { id: toastId });
+                        refreshDocuments();
+                      } catch (err) {
+                        console.error('Failed to upload', err);
+                        toast.error('Failed to upload document', { id: toastId });
+                      }
+                      e.target.value = ''; // Reset input
+                    }} 
+                  />
+                </label>
+              )}
             </div>
           )}
         </div>
 
-      </div>
-
-      <div className="relative mt-auto border-t border-white/5 py-3">
-        {!collapsed && (
-          <div className="px-3 mb-4">
-            <ModelSelector />
-          </div>
-        )}
-        <button onClick={() => setProfileOpen(!profileOpen)} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors outline-none">
-          <img src="https://i.pravatar.cc/150?img=11" alt="Profile" className="w-8 h-8 rounded-full shrink-0 object-cover border border-white/10" />
+        {/* Chat History Section */}
+        <div>
           {!collapsed && (
-            <div className="flex flex-col items-start overflow-hidden">
-              <span className="text-sm font-medium text-white whitespace-nowrap">Rajesh Kayal</span>
-              <span className="text-[10px] text-white/50">Free Plan</span>
+            <button 
+              onClick={() => setChatsOpen(!chatsOpen)} 
+              className="w-full flex items-center justify-between mb-2 px-1 mt-2"
+            >
+              <h3 className="text-[10px] uppercase tracking-wider text-white/40 font-bold">Chat History</h3>
+              <svg className={`w-3 h-3 text-white/40 transition-transform ${chatsOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          )}
+          
+          {(chatsOpen || collapsed) && (
+            <div className="space-y-1">
+              {chats.length === 0 ? !collapsed && (
+                <div className="px-2 py-3 text-[10px] text-white/20 text-center border border-dashed border-white/5 rounded-lg">
+                  No previous chats
+                </div>
+              ) : chats.map((chat) => (
+                <div 
+                  key={chat._id} 
+                  onClick={() => {
+                    if (editingChatId !== chat._id) {
+                      setActiveChatId(chat._id);
+                      navigate(`/chat/${activeWorkspaceId}/${chat._id}`);
+                    }
+                  }}
+                  className={`group relative flex items-center p-2 rounded-lg cursor-pointer transition-colors ${collapsed ? 'justify-center' : ''} ${activeChatId === chat._id ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-white/70 hover:text-white'}`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden flex-1">
+                    <svg className={`w-4 h-4 shrink-0 ${activeChatId === chat._id ? 'text-brand' : 'text-white/40'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                    {editingChatId === chat._id ? (
+                      <form onSubmit={(e) => handleUpdateChat(e, chat._id)} className="flex-1 flex gap-1">
+                        <input 
+                          autoFocus
+                          type="text"
+                          value={editChatTitle}
+                          onChange={(e) => setEditChatTitle(e.target.value)}
+                          className="w-full bg-white/5 border border-white/20 rounded px-1 py-0.5 text-xs text-white outline-none"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </form>
+                    ) : (
+                      !collapsed && <span className="text-sm truncate">{chat.title}</span>
+                    )}
+                  </div>
+                  
+                  {!collapsed && (
+                    <div className="flex items-center gap-1">
+                      {editingChatId === chat._id ? (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setEditingChatId(null); }}
+                          className="p-1 hover:text-white transition-all text-white/40"
+                          title="Cancel"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingChatId(chat._id);
+                              setEditChatTitle(chat.title);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-brand transition-all text-white/40"
+                            title="Rename"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          </button>
+                          <button 
+                            onClick={(e) => handleDeleteChat(e, chat._id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all text-white/40"
+                            title="Delete"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
-        </button>
-
-        {profileOpen && !collapsed && (
-          <div className="absolute bottom-full left-4 mb-2 w-56 glass-dropdown rounded-xl py-2 z-50 text-white shadow-2xl">
-            <div className="px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-white/5 rounded-t-lg">
-              <div className="w-8 h-8 rounded-full bg-white/20 shrink-0"></div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">Rajesh Kayal</span>
-                <span className="text-xs text-white/50">Go</span>
-              </div>
-              <svg className="w-4 h-4 ml-auto text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-            <div className="h-px bg-white/10 my-1 mx-2"></div>
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg> Upgrade plan</button>
-            <Link to="/settings" className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> Settings</Link>
-            <div className="h-px bg-white/10 my-1 mx-2"></div>
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors" onClick={logout} ><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg> Log out</button>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Footer / User Profile */}
+      <div className="mt-auto border-t border-white/5 p-3 space-y-3">
+        
+        <div className="relative">
+          <button 
+            onClick={() => setProfileOpen(!profileOpen)} 
+            className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} p-2 rounded-xl hover:bg-white/5 transition-colors`}
+          >
+            <img src="https://i.pravatar.cc/150?img=11" alt="Profile" className="w-8 h-8 rounded-full shrink-0 object-cover border border-white/10" />
+            {!collapsed && (
+              <div className="flex flex-col items-start overflow-hidden">
+                <span className="text-sm font-medium text-white truncate w-full">Rajesh Kayal</span>
+                <span className="text-[10px] text-white/50 uppercase tracking-wider">Free Plan</span>
+              </div>
+            )}
+          </button>
+
+          {profileOpen && !collapsed && (
+            <div className="absolute bottom-full left-0 mb-2 w-full glass-dropdown rounded-xl py-2 z-50 shadow-2xl border border-white/5 animate-in slide-in-from-bottom-2 duration-200">
+              <button 
+                onClick={() => { navigate('/feedback'); setProfileOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg> 
+                <span>Send Feedback</span>
+              </button>
+              <button 
+                onClick={() => { navigate('/upgrade'); setProfileOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                <span>Upgrade to Pro</span>
+              </button>
+              <div className="h-px bg-white/5 my-1 mx-2"></div>
+              <button 
+                onClick={logout}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-400/5 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                <span>Log out</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </aside>
   );
 };

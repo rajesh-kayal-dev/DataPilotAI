@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import axiosInstance from '../utils/axiosInstance';
 
+import type { Document } from '../types';
+
 const steps = [
   { id: 1, title: 'Upload Complete' },
   { id: 2, title: 'Text Extraction' },
@@ -19,19 +21,38 @@ const ProcessingStatus: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [chunksCreated, setChunksCreated] = useState<number>(0);
   const [timeTaken, setTimeTaken] = useState<number>(0);
-  const [document, setDocument] = useState<any>(null);
+  const [document, setDocument] = useState<Document | null>(null);
   
   const [isFailed, setIsFailed] = useState<boolean>(false);
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
+
+  const handleCancel = async () => {
+    if (!docId || isCancelling) return;
+    if (window.confirm('Are you sure you want to cancel the upload? This will remove all processed data.')) {
+      setIsCancelling(true);
+      try {
+        await axiosInstance.post(`/documents/${docId}/cancel`);
+        navigate('/dashboard');
+      } catch (err) {
+        console.error('Failed to cancel upload:', err);
+        // Redirect anyway as the user wants out
+        navigate('/dashboard');
+      } finally {
+        setIsCancelling(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchDoc = async () => {
       if (!docId) return;
       try {
-        const res = await axiosInstance.get(`/api/v1/documents`);
-        const doc = res.data.find((d: any) => d._id === docId);
+        const res = await axiosInstance.get(`/documents`);
+        const safeDocs = Array.isArray(res.data) ? res.data : [];
+        const doc = safeDocs.find((d: any) => d._id === docId);
         if (doc) setDocument(doc);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch document details:', err);
       }
     };
     fetchDoc();
@@ -49,22 +70,32 @@ const ProcessingStatus: React.FC = () => {
   useEffect(() => {
     if (!docId) return;
 
-    let timeout: NodeJS.Timeout;
+    let timeout: any;
+    let isMounted = true;
 
     const pollStatus = async () => {
+      if (!isMounted) return;
+      
       try {
-        const res = await axiosInstance.get(`/api/v1/documents/${docId}/status`);
+        const res = await axiosInstance.get(`/documents/${docId}/status`);
         const { status } = res.data;
 
-        if (status === 'uploaded') {
+        if (status === 'pending' || status === 'uploaded') {
           setCurrentStep(1);
         } else if (status === 'processing') {
-          setCurrentStep(3); // Just an intermediate visual step
+          setCurrentStep(3);
           setChunksCreated((prev) => prev + Math.floor(Math.random() * 5));
-        } else if (status === 'ready') {
+        } else if (status === 'completed' || status === 'ready' || status === 'success') {
           setCurrentStep(6);
           setTimeout(() => {
-            navigate('/chat');
+            if (isMounted) {
+              const workspaceId = res.data.document?.workspaceId || res.data.workspaceId;
+              if (workspaceId) {
+                navigate(`/chat/${workspaceId}`);
+              } else {
+                navigate('/chat');
+              }
+            }
           }, 1500);
           return; // Stop polling
         } else if (status === 'failed') {
@@ -72,16 +103,23 @@ const ProcessingStatus: React.FC = () => {
           return; // Stop polling
         }
 
-        timeout = setTimeout(pollStatus, 3000);
+        if (isMounted) {
+          timeout = setTimeout(pollStatus, 3000);
+        }
       } catch (error) {
         console.error('Error polling status:', error);
-        timeout = setTimeout(pollStatus, 5000);
+        if (isMounted) {
+          timeout = setTimeout(pollStatus, 5000);
+        }
       }
     };
 
     pollStatus();
 
-    return () => clearTimeout(timeout);
+    return () => {
+      isMounted = false;
+      if (timeout) clearTimeout(timeout);
+    };
   }, [docId, navigate]);
 
   return (
@@ -198,6 +236,25 @@ const ProcessingStatus: React.FC = () => {
                 </svg>
                 Document is ready. Redirecting to chat...
               </p>
+            </div>
+          )}
+          
+          {currentStep < 6 && !isFailed && (
+            <div className="mt-12 flex justify-center">
+              <button 
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="px-6 py-2.5 rounded-xl border border-white/10 text-white/40 text-sm font-medium hover:text-red-400 hover:border-red-400/30 hover:bg-red-400/5 transition-all flex items-center gap-2"
+              >
+                {isCancelling ? (
+                   <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                Cancel Upload
+              </button>
             </div>
           )}
         </div>

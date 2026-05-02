@@ -5,23 +5,31 @@ import Message from '../components/Message';
 import ChatInput from '../components/ChatInput';
 import axiosInstance from '../utils/axiosInstance';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { toast } from 'react-hot-toast';
 
-interface ChatMessage {
-  _id?: string;
-  id?: number;
-  role: 'user' | 'assistant';
-  content: string;
-  source?: string;
-}
+import type { ChatMessage, ChatResponse } from '../types';
 
 const Chat: React.FC = () => {
-  const { chatId } = useParams<{ chatId: string }>();
+  const { workspaceId, chatId } = useParams<{ workspaceId: string; chatId?: string }>();
   const navigate = useNavigate();
-  const { activeWorkspaceId, setActiveChatId } = useWorkspace();
+  const { 
+    workspaces, documents, activeWorkspaceId, setActiveWorkspaceId, 
+    setActiveChatId, refreshDocuments, refreshChats,
+    setCurrentChatMessages, setCurrentChatTitle
+  } = useWorkspace();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatTitle, setChatTitle] = useState<string>('New Chat');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Sync with global context for Navbar export
+  useEffect(() => {
+    setCurrentChatMessages(messages);
+  }, [messages, setCurrentChatMessages]);
+
+  useEffect(() => {
+    setCurrentChatTitle(chatTitle);
+  }, [chatTitle, setCurrentChatTitle]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,70 +40,130 @@ const Chat: React.FC = () => {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (chatId) setActiveChatId(chatId);
-  }, [chatId]);
+    if (workspaceId && workspaceId !== activeWorkspaceId) {
+      setActiveWorkspaceId(workspaceId);
+    }
+  }, [workspaceId, activeWorkspaceId]);
 
   useEffect(() => {
-    const fetchChat = async () => {
-      if (!chatId) return;
-      try {
-        setMessages([]);
-        setChatTitle('New Chat');
-      } catch (err) {
-        console.error('Failed to fetch chat', err);
-        navigate('/dashboard');
-      }
-    };
-    fetchChat();
-  }, [chatId]);
+    // Force refresh documents when entering chat
+    if (workspaceId) refreshDocuments();
+
+    if (chatId) {
+      setActiveChatId(chatId);
+      const fetchChatSession = async () => {
+        try {
+          const res = await axiosInstance.get(`/chat/sessions/${chatId}`);
+          if (res.data) {
+            setChatTitle(res.data.title || 'Chat');
+            setMessages(res.data.messages || []);
+          }
+        } catch (err) {
+          console.error('Failed to fetch chat session:', err);
+        }
+      };
+      fetchChatSession();
+    } else {
+      setActiveChatId(null);
+      setMessages([]);
+      setChatTitle('New Chat');
+    }
+  }, [workspaceId, chatId]);
+
+  // Polling for processing documents
+  useEffect(() => {
+    const hasProcessing = documents.some(d => d.status === 'processing' || d.status === 'pending');
+    if (hasProcessing) {
+      const interval = setInterval(() => {
+        refreshDocuments();
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [documents, workspaceId]);
 
   const handleSend = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
     const userMsg: ChatMessage = { role: 'user', content };
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    setMessages(prev => Array.isArray(prev) ? [...prev, userMsg] : [userMsg]);
     setIsLoading(true);
 
     try {
-      // 1. Get AI Answer (using orchestrator which takes documentId, but for workspace chat we need a different approach or just use the last uploaded doc for now)
-      // For now, let's assume we chat with ALL docs in workspace or the orchestrator handles it.
-      // Actually, let's fetch docs for this workspace and use the first one if it exists.
-      const docRes = await axiosInstance.get(`/api/v1/documents?workspaceId=${activeWorkspaceId}`);
-      const safeDocuments = Array.isArray(docRes.data) ? docRes.data : [];
-      const documentId = safeDocuments.length > 0 ? safeDocuments[0]?._id : null;
-
-      const res = await axiosInstance.post('/api/v1/chat', { 
+      // 1. Check for documents
+      if (!activeWorkspaceId || activeWorkspaceId === 'null') {
+        throw new Error('No active workspace selected. Please select a workspace from the sidebar.');
+      }
+      
+      // 2. Post to chat
+      const res = await axiosInstance.post(`/chat`, { 
         question: content,
-        documentId 
+        workspaceId: activeWorkspaceId,
+        chatId: chatId || undefined
       });
+      
+      // Check for explicit backend error messages
+      if (res.data?.success === false && res.data?.error) {
+        throw new Error(res.data.error);
+      }
+
+      let answer = res.data?.answer;
+      
+      // Handle empty results
+      if (!answer || typeof answer !== 'string' || answer.trim() === '') {
+        answer = "I couldn't find relevant information in your documents to answer this question.";
+      } else if (answer.toLowerCase().includes("system busy")) {
+        answer = "The system is currently busy processing your request. Please try again in a moment.";
+      } else if (answer.toLowerCase().includes("information not found")) {
+        answer = "I'm sorry, but I couldn't find any information related to your query in the uploaded documents.";
+      }
       
       const assistantMsg: ChatMessage = {
         role: 'assistant',
-        content: res.data?.answer?.trim() ? res.data.answer : 'No response generated',
-        source: res.data.source,
+        content: answer,
+        source: res.data?.source,
+        modelName: res.data?.model,
+        confidence: res.data?.confidence,
+        animate: true
       };
 
-      const finalMessages = [...updatedMessages, assistantMsg];
-      setMessages(finalMessages);
+      setMessages(prev => Array.isArray(prev) ? [...prev, assistantMsg] : [assistantMsg]);
 
-      // 2. Save Messages and Handle Naming
-      let newTitle = chatTitle;
-      if (messages.length === 0) {
-        // Auto-name after first message
-        const words = content.split(' ').slice(0, 6).join(' ');
-        newTitle = words.length > 30 ? words.slice(0, 30) + '...' : words;
-        setChatTitle(newTitle);
+      // 3. Update title if first message and navigate to generated chatId
+      if (!chatId && res.data?.chatId) {
+        setChatTitle(res.data.title || 'Chat');
+        await refreshChats(); // Force the Sidebar to immediately show the new chat!
+        navigate(`/chat/${activeWorkspaceId}/${res.data.chatId}`, { replace: true });
       }
 
-    } catch (error) {
-      console.error(error);
-      setMessages((prev) => [
+    } catch (error: any) {
+      console.error('Chat error:', error);
+      const errorMessage = error.message || 'Something went wrong. Please try again.';
+      setMessages((prev) => Array.isArray(prev) ? [
         ...prev,
-        { role: 'assistant', content: 'Something went wrong. Please try again.' },
-      ]);
+        { role: 'assistant', content: errorMessage, animate: true },
+      ] : [{ role: 'assistant', content: errorMessage, animate: true }]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    if (!activeWorkspaceId || activeWorkspaceId === 'null') {
+      toast.error('No active workspace selected.');
+      return;
+    }
+    const toastId = toast.loading('Uploading document...');
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('workspaceId', activeWorkspaceId);
+      
+      await axiosInstance.post('/documents/upload', formData);
+      toast.success('Document uploaded and processing started', { id: toastId });
+      refreshDocuments();
+    } catch (err) {
+      console.error('Failed to upload', err);
+      toast.error('Failed to upload document', { id: toastId });
     }
   };
 
@@ -113,8 +181,12 @@ const Chat: React.FC = () => {
                 {chatTitle}
               </h2>
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                <span className="text-[10px] text-white/40 uppercase tracking-wider font-bold">Workspace AI Ready</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${documents.length > 0 ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                <span className="text-[10px] text-white/40 uppercase tracking-wider font-bold truncate max-w-[300px]">
+                  {documents.length > 0 
+                    ? `Chatting with: ${documents.map(d => d.name).join(', ')}` 
+                    : 'No documents indexed'}
+                </span>
               </div>
             </div>
           </div>
@@ -138,12 +210,12 @@ const Chat: React.FC = () => {
                   {msg.role === 'user' ? 'You' : 'AI Assistant'}
                 </span>
                 <div className="w-full">
-                  <Message role={msg.role} content={msg.content} source={msg.source} />
+                  <Message role={msg.role} content={msg.content} source={msg.source} animate={msg.animate} />
                 </div>
-                {msg.role === 'assistant' && (((msg as any).modelName) || ((msg as any).confidence !== undefined)) && (
+                {msg.role === 'assistant' && (msg.modelName || msg.confidence !== undefined) && (
                   <div className="px-1 text-[10px] text-white/40 flex items-center gap-3">
-                    {(msg as any).modelName && <span>Model: {(msg as any).modelName}</span>}
-                    {(msg as any).confidence !== undefined && <span>Confidence: {Number((msg as any).confidence).toFixed(2)}</span>}
+                    {msg.modelName && <span>Model: {msg.modelName}</span>}
+                    {msg.confidence !== undefined && <span>Confidence: {Number(msg.confidence).toFixed(2)}</span>}
                   </div>
                 )}
               </div>
@@ -168,7 +240,7 @@ const Chat: React.FC = () => {
         <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-[#08060E] via-[#08060E] to-transparent z-20">
           <div className="max-w-3xl mx-auto relative group">
             <div className={isLoading ? 'opacity-70 pointer-events-none' : ''}>
-              <ChatInput onSend={handleSend} />
+              <ChatInput onSend={handleSend} onUpload={handleUpload} isLoading={isLoading} />
             </div>
             {isLoading && (
               <div className="absolute inset-0 rounded-2xl" aria-hidden="true" />
