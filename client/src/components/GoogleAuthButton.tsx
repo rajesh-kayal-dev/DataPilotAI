@@ -43,7 +43,6 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ buttonText, isSignu
         size="medium"
         logo_alignment="left"
         width="350"
-        useOneTap
       />
     </div>
   );

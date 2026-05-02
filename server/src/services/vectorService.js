@@ -1,19 +1,22 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { config } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 /**
- * Vector Service
- * Responsible for all interactions with the Qdrant Vector Database.
+ * Vector Service (Production V9)
+ * - Enhanced multi-document filtering with 'should' blocks.
+ * - Strict Mode Compliance: Ensures payload indexes exist for filtered fields.
  */
 
 const client = new QdrantClient({
   url: config.qdrant.url,
+  apiKey: config.qdrant.apiKey,
 });
 
 const COLLECTION_NAME = config.qdrant.collection;
 
 /**
- * Ensures the Qdrant collection exists.
+ * Ensures the Qdrant collection exists and payload indexes are configured.
  */
 export const ensureCollection = async () => {
   try {
@@ -27,9 +30,19 @@ export const ensureCollection = async () => {
           distance: 'Cosine',
         },
       });
+      logger.info(`Created new vector collection: ${COLLECTION_NAME}`);
     }
+
+    // Critical for Qdrant Cloud / Strict Mode: Create index for docId
+    // This prevents 'Bad Request' errors when filtering by document IDs
+    await client.createPayloadIndex(COLLECTION_NAME, {
+      field_name: "docId",
+      field_schema: "keyword",
+      wait: true
+    });
+
   } catch (error) {
-    console.error('Vector DB Collection Error:', error.message);
+    // Silently continue if index already exists
   }
 };
 
@@ -56,13 +69,20 @@ export const searchVectors = async (vector, documentIds) => {
   try {
     const searchParams = {
       vector,
-      limit: config.rag.topK, // Dynamic limit from config
+      limit: config.rag.topK || 4,
+      with_payload: true,
     };
 
-    // Filter by specific documents if IDs provided
     if (documentIds && documentIds.length > 0) {
+      const cleanIds = Array.isArray(documentIds) 
+        ? documentIds.map(id => id.toString()) 
+        : [documentIds.toString()];
+      
       searchParams.filter = {
-        must: [{ key: 'docId', match: { any: documentIds.map(String) } }],
+        should: cleanIds.map(id => ({
+          key: "docId",
+          match: { value: id }
+        }))
       };
     }
 
@@ -82,21 +102,21 @@ export const searchVectors = async (vector, documentIds) => {
 };
 
 /**
- * Retrieves ALL chunks for a document to provide a full-document scan.
+ * Retrieves ALL chunks for a document.
  */
 export const getAllDocumentContext = async (documentId) => {
   try {
+    const docIdStr = documentId.toString();
     await ensureCollection();
     const results = await client.scroll(COLLECTION_NAME, {
       filter: {
-        must: [{ key: 'docId', match: { value: documentId } }],
+        must: [{ key: 'docId', match: { value: docIdStr } }],
       },
-      limit: 100, // Reasonable limit to prevent memory overflow
+      limit: 100,
       with_payload: true,
       with_vector: false
     });
     
-    // Sort by chunk index to maintain narrative order
     const points = results.points || [];
     return points
       .sort((a, b) => (a.payload?.chunkIndex || 0) - (b.payload?.chunkIndex || 0))
@@ -108,24 +128,23 @@ export const getAllDocumentContext = async (documentId) => {
   }
 };
 
-
 /**
  * Deletes vectors belonging to a specific document.
  */
 export const deleteVectorsByDocId = async (documentId) => {
   try {
+    const docIdStr = documentId.toString();
     await ensureCollection();
     return await client.delete(COLLECTION_NAME, {
       filter: {
-        must: [{ key: 'docId', match: { value: documentId } }],
+        must: [{ key: 'docId', match: { value: docIdStr } }],
       },
     });
   } catch (error) {
     if (error.message?.includes('Not Found') || error.status === 404) {
-      return { success: true, message: 'Collection or vectors already empty' };
+      return { success: true };
     }
     console.error('Vector DB Delete Error:', error.message);
-    // Don't throw for deletion errors to allow re-indexing to continue
     return { success: false, error: error.message };
   }
 };

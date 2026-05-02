@@ -41,6 +41,6 @@ export const calculateConfidence = (question, chunks) => {
   return {
     score: parseFloat(finalScore.toFixed(2)),
     alignment: parseFloat(alignmentScore.toFixed(2)),
-    isReliable: finalScore >= 0.38 && alignmentScore >= 0.25 
+    isReliable: finalScore >= 0.30 && alignmentScore >= 0.20 
   };
 };

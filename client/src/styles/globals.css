@@ -829,3 +829,16 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0;
   color: #E2D9F3;
 }
+
+/* --- TTS Speaking Animation --- */
+@keyframes bird-speaking {
+  0% { transform: scale(1); box-shadow: 0 0 0px rgba(168, 85, 247, 0); }
+  50% { transform: scale(1.08); box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); }
+  100% { transform: scale(1); box-shadow: 0 0 0px rgba(168, 85, 247, 0); }
+}
+
+.speaking-animation {
+  animation: bird-speaking 1.5s ease-in-out infinite;
+  border-color: rgba(168, 85, 247, 0.6) !important;
+  background: rgba(168, 85, 247, 0.15) !important;
+}

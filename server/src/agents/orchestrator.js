@@ -10,12 +10,12 @@ import { isValidModel, resolveModel } from '../config/modelRegistry.js';
 import User from '../models/User.js';
 
 /**
- * Orchestrator (Production V6)
+ * Orchestrator (Production V7 - With Memory)
  * Uses RAG_MODE to control strict vs hybrid answering behavior.
  */
 export const processChatFlow = async (question, documentIds, userId, options = {}) => {
   const startTime = Date.now();
-  const { onStream, workspaceId } = options;
+  const { onStream, workspaceId, history = [] } = options;
 
   // Ensure documentIds is an array
   const docIdsArray = Array.isArray(documentIds) ? documentIds : (documentIds ? [documentIds] : []);
@@ -54,8 +54,11 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     let isReliable = false;
     let chunks = [];
 
+    let docNames = '';
+    let hasMatchedChunks = false;
     const hasDocuments = docIdsArray.length > 0;
 
+    let workspaceDocs = [];
     if (hasDocuments) {
       const retrievalResult = await retrieveContext(question, docIdsArray, intent === 'doc_summary');
       context = retrievalResult.context;
@@ -63,6 +66,16 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       alignment = retrievalResult.alignment;
       isReliable = retrievalResult.isReliable;
       chunks = retrievalResult.chunks;
+      docNames = retrievalResult.docNames;
+      hasMatchedChunks = retrievalResult.hasMatchedChunks;
+
+      // Fetch doc metadata for keyword matching
+      try {
+        const DocumentModel = (await import('../models/Document.js')).default;
+        workspaceDocs = await DocumentModel.find({ _id: { $in: docIdsArray } }).select('name');
+      } catch (err) {
+        logger.warn('Failed to fetch doc metadata for keyword matching', { err });
+      }
     }
 
     // 5. RAG Mode Logic (Strict vs Hybrid)
@@ -81,12 +94,19 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       };
     }
 
-    // 6. Model Resolution
+    // 6. Model Resolution & User Identity
     let modelId;
+    let userName = 'User';
+    let userEmail = '';
+
     if (userId) {
-      const user = await User.findById(userId).select('selectedModel');
-      if (user?.selectedModel && isValidModel(user.selectedModel)) {
-        modelId = resolveModel(user.selectedModel);
+      const user = await User.findById(userId).select('selectedModel name email');
+      if (user) {
+        userName = user.name || 'User';
+        userEmail = user.email || '';
+        if (user.selectedModel && isValidModel(user.selectedModel)) {
+          modelId = resolveModel(user.selectedModel);
+        }
       }
     }
 
@@ -100,20 +120,37 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     const result = await generateAnswer(question, context, modelId, { 
       onStream, 
       userId,
+      userName,
+      userEmail,
       isDocFound: intent === 'doc_summary' || isReliable,
       hasDocuments,
-      isGreeting: intent === 'greeting'
+      isGreeting: intent === 'greeting',
+      history
     });
 
     // 8. Result Packaging
+    let answer = result.success ? result.answer : result.error;
+    const isHybridGeneral = result.success && hasDocuments && !isReliable && intent !== 'greeting';
+    
+    if (isHybridGeneral) {
+      answer = `Sorry, but I am not finding anything related in your provided document.\n\n${answer}`;
+    }
+
+    // Enhanced source selection: if question mentions a doc name, prioritize it
+    const questionLower = question.toLowerCase();
+    const docByKeyword = (workspaceDocs || []).filter(d => {
+      const baseName = d.name.split('.')[0].toLowerCase();
+      return baseName.length > 2 && questionLower.includes(baseName);
+    }).map(d => d.name).join(', ');
+
     const responseTime = Date.now() - startTime;
     const finalPayload = {
       success: result.success,
-      answer: result.success ? result.answer : result.error,
+      answer,
       model: result.model,
       confidence,
       alignment,
-      source: isReliable ? 'Document' : 'General Knowledge',
+      source: docByKeyword || ((isReliable || hasMatchedChunks) ? (docNames || 'Document') : 'General Knowledge'),
       responseTime,
       cached: false,
       chunks: chunks.slice(0, 3)

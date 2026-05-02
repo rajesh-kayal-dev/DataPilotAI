@@ -17,12 +17,12 @@ const userSchema = new mongoose.Schema({
     googleId: {
         type: String,
         unique: true,
-        sparse: true // Vital: allows multiple users to have NO googleId (local login) without unique errors
+        sparse: true 
     },
     authProvider: {
         type: String,
         enum: ["local", "google"],
-        default: "local" // Helps you identify how the user originally joined
+        default: "local" 
     },
     isVerified: {
         type: Boolean,
@@ -32,6 +32,21 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['free', 'pro'],
         default: 'free',
+    },
+    // Detailed plan tracking
+    planId: {
+        type: String,
+        enum: ['free', 'pro_monthly', 'pro_6month'],
+        default: 'free'
+    },
+    subscriptionExpiry: {
+        type: Date,
+    },
+    // For "stacking" plans
+    queuedPlanId: {
+        type: String,
+        enum: [null, 'pro_monthly', 'pro_6month'],
+        default: null
     },
     selectedModel: {
         type: String,

@@ -5,26 +5,54 @@ import { logger } from '../utils/logger.js';
 import { llmCircuitBreaker } from '../utils/circuitBreaker.js';
 
 /**
- * Chat Agent (Production V5)
- * Zero hardcoded values. Full control via config suite.
+ * Chat Agent (Production V6 - Memory Support)
+ * Construct a message array including historical context for multi-turn conversations.
  */
 export const generateAnswer = async (question, context, model, options = {}) => {
   const { onStream, retryCount = 0, isFallback = false } = options;
   const selectedModel = model || config.openrouter.chatModel;
 
-  // 1. Cost Protection: Stop if max retries exceeded
   if (retryCount > config.llm.retries) {
     logger.error('Max retries exceeded for LLM request', { userId: options.userId, model: selectedModel });
     return { success: false, error: 'AI service temporarily busy', model: selectedModel };
   }
 
   const apiAction = async () => {
-    const { isDocFound = true, hasDocuments = true, isGreeting = false } = options;
+    const { 
+      isDocFound = true, 
+      hasDocuments = true, 
+      isGreeting = false,
+      history = [] 
+    } = options;
+
+    // 1. Construct Message Array with System Identity
+    const chatMessages = [];
+    
+    // Add Identity: Tell the AI who the user is
+    chatMessages.push({
+      role: 'system',
+      content: `You are DataPilot AI, a professional intelligence assistant. You are chatting with ${options.userName || 'a user'}. Always refer to them by their name if appropriate. If they ask about themselves, you have access to their profile: Name: ${options.userName}, Email: ${options.userEmail || 'Not provided'}.`
+    });
+
+    // Add History
+    const historyExchanges = history.map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content
+    })).slice(-8);
+    
+    chatMessages.push(...historyExchanges);
+
+    // 2. Add current question with RAG prompt
+    chatMessages.push({
+      role: 'user',
+      content: buildRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting)
+    });
+
     const response = await axios.post(
       `${config.openrouter.baseUrl}/chat/completions`,
       {
         model: selectedModel,
-        messages: [{ role: 'user', content: buildRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting) }],
+        messages: chatMessages,
         max_tokens: isFallback ? 150 : config.llm.maxTokens,
         temperature: config.llm.temperature,
         stream: !!onStream,
@@ -41,7 +69,6 @@ export const generateAnswer = async (question, context, model, options = {}) => 
       }
     );
 
-    // Stream handler
     if (onStream) {
       return new Promise((resolve, reject) => {
         let fullText = '';

@@ -28,7 +28,7 @@ export const setCachedResponse = async (key, data, ttl = 3600) => {
     if (!redisClient) return;
     // Updated for node-redis v4+ options object
     await redisClient.set(key, JSON.stringify(data), {
-      EX: ttl
+      ex: ttl
     });
   } catch (error) {
     console.error('Cache Set Error:', error.message);

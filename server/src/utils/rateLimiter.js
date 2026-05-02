@@ -17,12 +17,12 @@ export const checkRateLimit = async (userId) => {
 
   try {
     // node-redis v4+ uses .multi() for atomic operations
-    const results = await redisClient.multi()
-      .incr(minuteKey)
-      .incr(dailyKey)
-      .expire(minuteKey, rateWindow)
-      .expire(dailyKey, 86400)
-      .exec();
+    const p = redisClient.pipeline();
+    p.incr(minuteKey);
+    p.incr(dailyKey);
+    p.expire(minuteKey, rateWindow);
+    p.expire(dailyKey, 86400);
+    const results = await p.exec();
 
     // results is an array of responses: [minCount, dayCount, exp1, exp2]
     const minCount = results[0];

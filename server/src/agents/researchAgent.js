@@ -5,16 +5,20 @@ import { calculateConfidence } from '../utils/confidenceScore.js';
 import Document from '../models/Document.js';
 
 /**
- * Research Agent (Production V3)
- * Handles semantic search with dynamic thresholds based on intent.
+ * Research Agent (Production V5)
+ * - Intelligent source attribution: Returns only the names of documents that actually matched the query.
  */
 export const retrieveContext = async (question, documentIds, isSummary = false) => {
-  // 0. Fetch Document Metadata for "Global Awareness"
-  // Since we might be searching across multiple docs, we get a comma separated list of names
+  // 0. Fetch Document Metadata
   const docsMetadata = await Document.find({ _id: { $in: documentIds } }).select('name');
-  const docNames = docsMetadata.length > 0 ? docsMetadata.map(d => d.name).join(', ') : 'Workspace Documents';
+  const docNamesMap = docsMetadata.reduce((acc, doc) => {
+    acc[doc._id.toString()] = doc.name;
+    return acc;
+  }, {});
+  
+  const allDocNames = docsMetadata.length > 0 ? docsMetadata.map(d => d.name).join(', ') : 'Workspace Documents';
 
-  // 1. Handle Summary / Meta Queries (FULL DOCUMENT SCAN & CACHE)
+  // 1. Handle Summary / Meta Queries
   if (isSummary && documentIds.length === 1) {
     const documentId = documentIds[0];
     const { getCachedResponse, setCachedResponse } = await import('../utils/cache.js');
@@ -24,50 +28,54 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
     let fullDocText = await getCachedResponse(cacheKey);
     
     if (!fullDocText) {
-      // First time: Scan whole document
       fullDocText = await getAllDocumentContext(documentId);
-      // Store in memory database (Redis)
-      await setCachedResponse(cacheKey, fullDocText, 86400); // Cache for 24 hours
+      await setCachedResponse(cacheKey, fullDocText, 86400);
     }
 
-    const context = `[DOCUMENT NAME: ${docNames}]\n[FULL DOCUMENT TEXT]\n${fullDocText}`;
+    const context = `[SOURCE DOCUMENT: ${allDocNames}]\n\n[FULL CONTENT]\n${fullDocText}`;
     
     return {
       context,
-      confidence: 0.99, // High confidence since we read the whole file
+      confidence: 0.99,
       alignment: 1,
       isReliable: true,
+      docNames: allDocNames, // For summaries, we use the specific doc name
       chunks: ['Analyzed full document from memory cache']
     };
-  } else if (isSummary && documentIds.length > 1) {
-      // For multi-document summaries, vector search is required. We'll skip the full-doc read to save tokens.
-      // Continue to vector search below
   }
 
-  // 2. Vector Search for Specific Questions
+  // 2. Vector Search
   const queryEmbedding = await generateEmbedding(question);
   const rawResults = await searchVectors(queryEmbedding, documentIds);
 
   // 3. Dynamic Filtering
   const threshold = config.rag.threshold;
   let filtered = rawResults.filter(item => item.score >= threshold);
-
-  // 4. Diversity Filtering
   let finalChunks = filtered.slice(0, config.rag.topK);
   
-  // 5. Global Context Injection: Always get the first chunk to understand the document theme
+  // 4. Global Context Injection (Theme)
   const globalChunks = rawResults.filter(item => item.chunkIndex === 0 || item.chunkIndex === 1);
   const themeContext = globalChunks.length > 0 ? globalChunks[0].content : '';
 
-
-  // 4. Advanced Scoring
+  // 5. Confidence Calculation
   const confidence = calculateConfidence(question, finalChunks);
 
-  // 5. Format Output
-  // Include Factual Document Name and Global Theme at the top of context
-  const context = `[DOCUMENT NAME: ${docNames}]\n` +
-                  (themeContext ? `[DOCUMENT THEME (CHUNK 0): ${themeContext.substring(0, 300)}...]\n\n` : '') + 
-                  finalChunks.map(item => item.content.trim()).join('\n\n');
+  // 6. Source Attribution: Get only the unique names of documents that provided chunks
+  const matchedDocIds = [...new Set(finalChunks.map(item => item.docId))];
+  const matchedDocNames = matchedDocIds.length > 0 
+    ? matchedDocIds.map(id => docNamesMap[id]).filter(Boolean).join(', ')
+    : '';
+
+  // 7. Format Context with Specific Source Labels for LLM
+  const formattedChunks = finalChunks.map(item => {
+    const sourceName = docNamesMap[item.docId] || 'Unknown Document';
+    return `[SOURCE: ${sourceName}]\n${item.content.trim()}`;
+  }).join('\n\n---\n\n');
+
+  const context = `[AVAILABLE SOURCES: ${allDocNames}]\n` +
+                  (themeContext ? `[THEME OVERVIEW]: ${themeContext.substring(0, 300)}...\n\n` : '') + 
+                  formattedChunks;
+
   const snippets = finalChunks.map(item => {
     const text = item.content.trim();
     return text.length > 120 ? text.substring(0, 120) + '...' : text;
@@ -78,6 +86,8 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
     confidence: confidence.score,
     alignment: confidence.alignment,
     isReliable: confidence.isReliable,
+    docNames: matchedDocNames || allDocNames, // Prefer specific matched names
+    hasMatchedChunks: finalChunks.length > 0,
     chunks: snippets
   };
 };

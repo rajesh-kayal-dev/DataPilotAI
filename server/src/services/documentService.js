@@ -2,23 +2,38 @@ import Document from '../models/Document.js';
 import { generateEmbedding } from './embeddingService.js';
 import { insertVectors, deleteVectorsByDocId } from './vectorService.js';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
 import { createRequire } from 'module';
+import { uploadToS3, deleteFromS3, getFileFromS3 } from './s3Service.js';
+
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
 /**
- * Document Service (Production V3)
- * Responsible for RAG pipeline with robust status tracking.
+ * Document Service (Production V4 - Cloud Migration)
+ * Fully migrated to AWS S3. Local filesystem code removed.
  */
+
+const streamToBuffer = async (stream) => {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('error', (err) => reject(err));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+};
 
 export const uploadDocument = async (file, userId, workspaceId) => {
   try {
+    // 1. Upload to S3
+    const { key, url } = await uploadToS3(file.buffer, file.originalname, file.mimetype);
+
+    // 2. Save record to DB
     const document = new Document({
       name: file.originalname,
       type: file.mimetype.split('/')[1],
       size: file.size,
-      filePath: file.path,
+      filePath: url, // Store full S3 URL
+      s3Key: key,    // Store key for deletion
       userId: userId,
       workspaceId,
       status: 'pending',
@@ -27,7 +42,7 @@ export const uploadDocument = async (file, userId, workspaceId) => {
     await document.save();
     return { success: true, document };
   } catch (error) {
-    throw new Error(`Failed to upload: ${error.message}`);
+    throw new Error(`Failed to upload to S3: ${error.message}`);
   }
 };
 
@@ -41,41 +56,38 @@ export const processDocument = async (documentId) => {
     // 1. Clear old vectors
     await deleteVectorsByDocId(documentId);
 
-    // 2. Extract Text
+    // 2. Extract Text from S3
+    const s3Stream = await getFileFromS3(document.s3Key);
+    const dataBuffer = await streamToBuffer(s3Stream);
+    
     let text = '';
     if (document.type === 'pdf') {
-      const dataBuffer = fs.readFileSync(document.filePath);
       const pdfData = await pdfParse(dataBuffer);
       text = pdfData.text;
     } else {
-      text = fs.readFileSync(document.filePath, 'utf8');
+      text = dataBuffer.toString('utf8');
     }
 
     if (!text || text.trim().length < 20) throw new Error('No readable text found in document');
 
-    // 3. Clean & Standard Recursive Chunking
+    // 3. Clean & Chunking
     text = text.replace(/-\s*\n/g, "").replace(/\r\n/g, "\n").trim();
     
     const CHUNK_SIZE = 1000;
     const CHUNK_OVERLAP = 200;
     const chunks = [];
     
-    // Recursive Split Logic
     const separators = ["\n\n", "\n", ". ", " "];
     
     const splitText = (input, size, overlap) => {
       let result = [];
       let paragraphs = input.split(separators[0]);
-      
       let currentChunk = "";
-      
       for (let p of paragraphs) {
         if ((currentChunk + p).length <= size) {
           currentChunk += (currentChunk ? "\n\n" : "") + p;
         } else {
           if (currentChunk) result.push(currentChunk);
-          
-          // If a single paragraph is larger than CHUNK_SIZE, split it by newlines
           if (p.length > size) {
             let lines = p.split(separators[1]);
             let lineChunk = "";
@@ -102,10 +114,9 @@ export const processDocument = async (documentId) => {
       if (c.trim().length > 40) chunks.push(c.trim());
     });
 
-    // 4. Create Embeddings & Index (Optimized with Parallel Processing)
+    // 4. Create Embeddings & Index
     const CONCURRENCY_LIMIT = 5;
     const points = [];
-    
     for (let i = 0; i < chunks.length; i += CONCURRENCY_LIMIT) {
       const batch = chunks.slice(i, i + CONCURRENCY_LIMIT);
       const batchPromises = batch.map(async (chunk, index) => {
@@ -121,7 +132,6 @@ export const processDocument = async (documentId) => {
           },
         };
       });
-      
       const batchResults = await Promise.all(batchPromises);
       points.push(...batchResults);
     }
@@ -130,6 +140,7 @@ export const processDocument = async (documentId) => {
     await insertVectors(points);
 
     await Document.findByIdAndUpdate(documentId, { status: 'completed' });
+    console.log('Your document has been uploaded'); 
     return { success: true };
 
   } catch (error) {
@@ -138,7 +149,7 @@ export const processDocument = async (documentId) => {
       $inc: { retryCount: 1 },
       lastError: error.message 
     });
-    throw error; // Re-throw for BullMQ retry
+    throw error;
   }
 };
 
@@ -153,8 +164,8 @@ export const deleteDocument = async (documentId) => {
   // 1. Delete from Vector DB
   await deleteVectorsByDocId(documentId);
   
-  // 2. Delete local file
-  if (fs.existsSync(document.filePath)) fs.unlinkSync(document.filePath);
+  // 2. Delete from S3
+  await deleteFromS3(document.s3Key);
   
   // 3. Delete from Memory Cache
   try {
@@ -163,7 +174,7 @@ export const deleteDocument = async (documentId) => {
       await redisClient.del(`cache:full_doc:${documentId}`);
     }
   } catch (error) {
-    console.error('Failed to clear redis cache for deleted doc:', error.message);
+    console.error('Failed to clear redis cache:', error.message);
   }
 
   // 4. Delete from Database

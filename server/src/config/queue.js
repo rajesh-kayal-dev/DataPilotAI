@@ -7,10 +7,7 @@ import { redisClient } from './redis.js';
  */
 
 export const documentQueue = new Queue('document-processing', {
-  connection: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: parseInt(process.env.REDIS_PORT) || 6379,
-  }
+  connection: process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 });
 
 export const addDocumentJob = async (data) => {

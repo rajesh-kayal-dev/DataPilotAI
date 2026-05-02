@@ -42,7 +42,7 @@ export const handleUpload = async (req, res) => {
     // 2. Offload processing to BullMQ worker
     await addDocumentJob({ 
       documentId: document._id, 
-      filePath: req.file.path,
+      filePath: document.filePath,
       userId 
     });
 

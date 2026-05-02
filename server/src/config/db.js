@@ -14,9 +14,9 @@ const connectDB = async () => {
 
   try {
     await mongoose.connect(process.env.MONGODB_URI, options);
-    logger.info('MongoDB connected successfully');
+    logger.info('MongoDB atlas connected successfully');
   } catch (error) {
-    logger.error('Initial MongoDB connection failed. Retrying...', { error: error.message });
+    logger.error(`Initial MongoDB connection failed: ${error.message}`, { error });
     setTimeout(connectDB, 5000); // Retry after 5s instead of exiting
   }
 };

@@ -1,30 +1,15 @@
 /**
- * Structured Logger
- * Simplified production logger for requests, errors, and performance.
+ * Clean Human-Readable Logger
+ * Avoids JSON noise and provides clear status updates.
  */
 export const logger = {
-  info: (msg, meta = {}) => {
-    console.log(JSON.stringify({ 
-      level: 'info', 
-      timestamp: new Date().toISOString(), 
-      message: msg, 
-      ...meta 
-    }));
+  info: (msg) => {
+    console.log(`[INFO] ${msg}`);
   },
-  warn: (msg, meta = {}) => {
-    console.warn(JSON.stringify({ 
-      level: 'warn', 
-      timestamp: new Date().toISOString(), 
-      message: msg, 
-      ...meta 
-    }));
+  warn: (msg) => {
+    console.warn(`[WARN] ${msg}`);
   },
   error: (msg, meta = {}) => {
-    console.error(JSON.stringify({ 
-      level: 'error', 
-      timestamp: new Date().toISOString(), 
-      message: msg, 
-      ...meta 
-    }));
+    console.error(`[ERROR] ${msg}`, meta.error || '');
   }
 };

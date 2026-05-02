@@ -13,6 +13,7 @@ const worker = new Worker('document-processing', async (job) => {
   logger.info(`Processing job ${job.id} for document ${documentId}`);
 
   try {
+    logger.info(`Document ${documentId} is processing...`);
     await processDocument(documentId);
     logger.info(`Successfully processed document ${documentId}`);
   } catch (error) {
@@ -20,10 +21,7 @@ const worker = new Worker('document-processing', async (job) => {
     throw error; // Let BullMQ handle the retry
   }
 }, {
-  connection: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: parseInt(process.env.REDIS_PORT) || 6379,
-  }
+  connection: process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 });
 
 worker.on('failed', (job, err) => {

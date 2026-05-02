@@ -228,7 +228,7 @@ const Chat: React.FC = () => {
                     <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                     <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-xs text-white/50">AI is typing...</span>
+                  <span className="text-xs text-white/50">Thinking...</span>
                 </div>
               </div>
             )}

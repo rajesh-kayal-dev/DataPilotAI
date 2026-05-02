@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import healthRoutes from './routes/healthRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -11,6 +10,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import workspaceRoutes from './routes/workspaceRoutes.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -24,7 +24,6 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '2mb' }));
 
 /**
@@ -41,6 +40,7 @@ app.use(`${API_V1}/models`, modelRoutes);
 app.use(`${API_V1}/feedback`, feedbackRoutes);
 app.use(`${API_V1}/admin`, adminRoutes);
 app.use(`${API_V1}`, googleAuthRoutes);
+app.use(`${API_V1}/payments`, paymentRoutes);
 
 /**
  * Global Error Handler
