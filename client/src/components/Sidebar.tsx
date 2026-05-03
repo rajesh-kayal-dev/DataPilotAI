@@ -151,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
   const handleDeleteDoc = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this document?')) {
       try {
-        await axiosInstance.delete(`/documents/${id}`);
+        await axiosInstance.delete(`/documents/${id}?workspaceId=${activeWorkspaceId}`);
         refreshDocuments();
         toast.success('Document has been deleted');
       } catch (err) {

@@ -30,7 +30,7 @@ export const setCachedResponse = async (key, data, ttl = 3600) => {
     await redisClient.set(key, JSON.stringify(data), {
       ex: ttl
     });
-  } catch (error) {
-    console.error('Cache Set Error:', error.message);
+  } catch {
+    // Best-effort cache — silently ignore Redis failures
   }
 };

@@ -849,4 +849,10 @@ h1, h2, h3, h4, h5, h6 {
   animation: bird-speaking 1.5s ease-in-out infinite;
   border-color: rgba(168, 85, 247, 0.6) !important;
   background: rgba(168, 85, 247, 0.15) !important;
+}
+
+/* --- Trace Panel Reveal Animation --- */
+@keyframes traceReveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

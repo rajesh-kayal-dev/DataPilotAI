@@ -12,10 +12,16 @@ const router = express.Router();
 
 router.get('/', procted, getDocuments);
 router.post('/upload', procted, upload.single('document'), handleUpload);
-router.get('/:id/status', procted, getDocumentStatus);
-router.post('/:id/cancel', procted, handleCancelUpload);
-router.delete('/:id', procted, handleDeleteDocument);
-router.post('/chat', procted, chatWithDocument);
-router.post('/:id/chat', procted, chatWithDocument);
+router.get('/:id/download', procted, (req, res, next) => {
+  // Pass workspaceId from query if needed for isolation check
+  next();
+}, async (req, res) => {
+  try {
+    const { handleDownload } = await import('../controllers/documentController.js');
+    return handleDownload(req, res);
+  } catch (err) {
+    res.status(500).json({ error: 'Download failed' });
+  }
+});
 
 export default router;

@@ -15,7 +15,9 @@ export const getDocuments = async (req, res) => {
     const { workspaceId } = req.query;
     
     const filter = { userId };
-    if (workspaceId) filter.workspaceId = workspaceId;
+    if (workspaceId && workspaceId !== 'all') {
+      filter.workspaceId = workspaceId;
+    }
 
     const documents = await Document.find(filter).sort({ createdAt: -1 });
     res.json(documents);
@@ -62,9 +64,12 @@ export const handleUpload = async (req, res) => {
 export const getDocumentStatus = async (req, res) => {
   try {
     const userId = req.user?.id;
-    const document = await Document.findOne({ _id: req.params.id, userId });
+    const { workspaceId } = req.query;
+    if (!workspaceId) return res.status(400).json({ error: 'Workspace ID is required' });
+
+    const document = await Document.findOne({ _id: req.params.id, userId, workspaceId });
     
-    if (!document) return res.status(404).json({ error: 'Document not found' });
+    if (!document) return res.status(404).json({ error: 'Document not found in this workspace' });
     res.json({ status: document.status });
   } catch (error) {
     res.status(500).json({ error: 'Internal error' });
@@ -74,8 +79,15 @@ export const getDocumentStatus = async (req, res) => {
 export const handleDeleteDocument = async (req, res) => {
   try {
     const userId = req.user?.id;
-    const document = await Document.findOne({ _id: req.params.id, userId });
-    if (!document) return res.status(404).json({ error: 'Access denied' });
+    const { workspaceId } = req.query;
+    
+    const filter = { _id: req.params.id, userId };
+    if (workspaceId && workspaceId !== 'all') {
+      filter.workspaceId = workspaceId;
+    }
+
+    const document = await Document.findOne(filter);
+    if (!document) return res.status(404).json({ error: 'Access denied or document not found' });
 
     await deleteDocument(req.params.id);
     res.json({ success: true, message: 'Document deleted' });
@@ -87,16 +99,19 @@ export const handleDeleteDocument = async (req, res) => {
 export const handleCancelUpload = async (req, res) => {
   try {
     const userId = req.user?.id;
-    const document = await Document.findOne({ _id: req.params.id, userId });
+    const { workspaceId } = req.query;
+    if (!workspaceId) return res.status(400).json({ error: 'Workspace ID is required' });
+
+    const document = await Document.findOne({ _id: req.params.id, userId, workspaceId });
     
     if (!document) {
-      return res.status(404).json({ error: 'Document not found' });
+      return res.status(404).json({ error: 'Document not found in this workspace' });
     }
 
     // Reuse deletion logic
     await deleteDocument(req.params.id);
     
-    logger.info('Upload cancelled and document removed', { documentId: req.params.id, userId });
+    logger.info('Upload cancelled and document removed', { documentId: req.params.id, userId, workspaceId });
     res.json({ success: true, message: 'Upload cancelled and data removed' });
   } catch (error) {
     logger.error('Cancel Upload Error', { error: error.message });
@@ -128,5 +143,34 @@ export const chatWithDocument = async (req, res) => {
   } catch (error) {
     logger.error('Chat Error', { error: error.message });
     res.status(500).json({ error: 'Chat failed' });
+  }
+};
+
+export const handleDownload = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const document = await Document.findOne({ _id: req.params.id, userId });
+    
+    if (!document) return res.status(404).json({ error: 'Document not found' });
+
+    // Stream from S3 instead of local filesystem
+    const { getFileFromS3 } = await import('../services/s3Service.js');
+    const s3Stream = await getFileFromS3(document.s3Key);
+    
+    // Set headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${document.name}"`);
+    const contentType = document.type === 'pdf' ? 'application/pdf' : 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    
+    // Pipe the S3 stream directly to response
+    s3Stream.pipe(res);
+    
+    s3Stream.on('error', (err) => {
+      logger.error('S3 Stream Error during download', { error: err.message });
+      if (!res.headersSent) res.status(500).json({ error: 'Failed to stream document' });
+    });
+  } catch (error) {
+    logger.error('Download Error', { error: error.message });
+    res.status(500).json({ error: 'Failed to download document' });
   }
 };

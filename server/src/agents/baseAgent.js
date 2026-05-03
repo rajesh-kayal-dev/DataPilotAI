@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+
 export class BaseAgent {
   constructor(name) {
     this.name = name;
@@ -8,8 +10,8 @@ export class BaseAgent {
     throw new Error(`${this.name}: 'execute' method not implemented.`);
   }
 
-  // Helper: Log agent actions
+  // Helper: Log agent actions (routes through centralized logger)
   log(message) {
-    console.log(`[${this.name}] ${message}`);
+    logger.info(`[${this.name}] ${message}`);
   }
 }

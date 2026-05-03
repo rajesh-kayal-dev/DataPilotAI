@@ -18,7 +18,7 @@ const Dashboard: React.FC = () => {
         axiosInstance.get('/auth/dashboard'),
         axiosInstance.get('/documents')
       ]);
-      
+
       setUser(userRes.data.user);
       const safeDocs = Array.isArray(docsRes.data) ? docsRes.data : [];
       setDocuments(safeDocs);
@@ -63,7 +63,7 @@ const Dashboard: React.FC = () => {
     <MainLayout>
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 md:p-8">
-          
+
           {/* Welcome Header */}
           <div className="mb-10 flex items-center justify-between">
             <div>
@@ -75,18 +75,18 @@ const Dashboard: React.FC = () => {
               </p>
             </div>
             {isPremium && (
-               <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-brand/10 border border-brand/20">
-                 <svg className="w-4 h-4 text-brand" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                 <span className="text-[10px] font-black text-brand uppercase tracking-widest">Premium</span>
-               </div>
+              <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-brand/10 border border-brand/20">
+                <svg className="w-4 h-4 text-brand" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                <span className="text-[10px] font-black text-brand uppercase tracking-widest">Premium</span>
+              </div>
             )}
           </div>
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            
+
             {/* Document Count Card */}
-            <div 
+            <div
               onClick={() => setShowDocsModal(true)}
               className={`glass-card rounded-2xl p-6 transition-all duration-500 cursor-pointer group hover:bg-white/5 ${isPremium ? 'border-brand/30 shadow-[0_0_20px_-10px_rgba(var(--brand-rgb),0.5)]' : ''}`}
             >
@@ -95,12 +95,12 @@ const Dashboard: React.FC = () => {
                   <svg className={`w-5 h-5 ${isPremium ? 'text-brand' : 'text-brand/70'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                 </div>
                 {isPremium && (
-                   <span className="text-[10px] text-white/30 font-bold uppercase">{docCount}/{docLimit} PDFs</span>
+                  <span className="text-[10px] text-white/30 font-bold uppercase">{docCount}/{docLimit} PDFs</span>
                 )}
               </div>
               <div className="text-2xl font-bold text-white mb-1">{docCount}</div>
               <div className="text-xs text-white/50">Total Documents</div>
-              
+
               {isPremium && (
                 <div className="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-brand rounded-full transition-all duration-1000" style={{ width: `${usagePercentage}%` }}></div>
@@ -113,21 +113,21 @@ const Dashboard: React.FC = () => {
 
             {/* Premium Models Card */}
             {isPremium ? (
-               <div 
+              <div
                 onClick={() => setShowModelsModal(true)}
                 className="glass-card rounded-2xl p-6 border-brand/20 cursor-pointer group hover:bg-white/5"
               >
-                 <div className="flex items-center justify-between mb-4">
-                   <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                     <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 112 0v1a1 1 0 11-2 0zM13.536 14.243a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707zM16.243 16.243a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707z" /></svg>
-                   </div>
-                 </div>
-                 <div className="text-lg font-bold text-white mb-1">Elite Models</div>
-                 <div className="text-[10px] text-white/50 uppercase tracking-wider">GPT-4o & Claude 3.5 Active</div>
-                 <div className="mt-4 pt-4 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">View Model Details →</span>
-                 </div>
-               </div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 112 0v1a1 1 0 11-2 0zM13.536 14.243a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707zM16.243 16.243a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707z" /></svg>
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-white mb-1">Elite Models</div>
+                <div className="text-[10px] text-white/50 uppercase tracking-wider">GPT-4o & Claude 3.5 Active</div>
+                <div className="mt-4 pt-4 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">View Model Details →</span>
+                </div>
+              </div>
             ) : (
               <div className="glass-card rounded-2xl p-6 opacity-50">
                 <div className="flex items-center justify-between mb-4">
@@ -154,13 +154,13 @@ const Dashboard: React.FC = () => {
 
           {/* Premium Call-to-action for Free Users */}
           {!isPremium ? (
-             <div className="mb-6 py-12 px-6 glass-card rounded-2xl border-dashed border-white/10 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
-               <h2 className="text-xl font-medium text-white mb-3">Upgrade to Premium</h2>
-               <p className="text-white/50 mb-8 max-w-lg mx-auto">Get 50 PDF uploads, unlimited workspaces, and access to GPT-4o for deeper document intelligence.</p>
-               <Link to="/upgrade" className="px-8 py-3.5 rounded-xl bg-brand text-white font-bold hover:bg-brand/90 transition-all shadow-lg shadow-brand/20">
-                 Explore Plans
-               </Link>
-             </div>
+            <div className="mb-6 py-12 px-6 glass-card rounded-2xl border-dashed border-white/10 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
+              <h2 className="text-xl font-medium text-white mb-3">Upgrade to Premium</h2>
+              <p className="text-white/50 mb-8 max-w-lg mx-auto">Get 50 PDF uploads, unlimited workspaces, and access to GPT-4o for deeper document intelligence.</p>
+              <Link to="/upgrade" className="px-8 py-3.5 rounded-xl bg-brand text-white font-bold hover:bg-brand/90 transition-all shadow-lg shadow-brand/20">
+                Explore Plans
+              </Link>
+            </div>
           ) : (
             <div className="mb-6 p-8 glass-card rounded-3xl border-brand/20 bg-brand/[0.02]">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -206,12 +206,35 @@ const Dashboard: React.FC = () => {
                       <p className="text-[10px] text-white/40 uppercase tracking-widest">{new Date(doc.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleDeleteDoc(doc._id)}
-                    className="p-2 text-white/30 hover:text-red-400 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={async () => {
+                        try {
+                          const res = await axiosInstance.get(`/documents/${doc._id}/download`, { responseType: 'blob' });
+                          const url = window.URL.createObjectURL(new Blob([res.data]));
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.setAttribute('download', doc.name);
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                        } catch (err) {
+                          toast.error('Failed to download document');
+                        }
+                      }}
+                      className="p-2 text-white/30 hover:text-brand transition-colors rounded-lg hover:bg-white/5"
+                      title="Download"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDoc(doc._id)}
+                      className="p-2 text-white/30 hover:text-red-400 transition-colors"
+                      title="Delete"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -238,14 +261,14 @@ const Dashboard: React.FC = () => {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            
+
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* GPT-4o */}
               <div className="p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/30 transition-all group">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                     <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5153-4.9066 6.0462 6.0462 0 0 0-4.4439-2.9147 6.0502 6.0502 0 0 0-5.0637 1.4774 6.058 6.058 0 0 0-4.4463 2.917 6.0547 6.0547 0 0 0 1.474 5.062 6.0506 6.0506 0 0 0-.5157 4.9108 6.0546 6.0546 0 0 0 4.4466 2.9147 6.0585 6.0585 0 0 0 5.061-1.4774 6.0581 6.0581 0 0 0 4.4463-2.917 6.0547 6.0547 0 0 0-1.474-5.062 6.0506 6.0506 0 0 0 .5157-4.9108zm-9.277 12.037a4.4273 4.4273 0 0 1-2.4993-.7714l.0103-.0058 3.3531-1.936a.7981.7981 0 0 0 .3992-.6914V13.567l1.7171.9913a.0152.0152 0 0 1 .0077.0127v3.928a4.4172 4.4172 0 0 1-2.99 4.374zm-9.2811-4.8703a4.417 4.417 0 0 1-.3908-2.617l.0103.0058 3.3531 1.936a.7981.7981 0 0 0 .7984 0l4.8757-2.815v1.9826a.0152.0152 0 0 1-.0053.0133l-3.4024 1.9642a4.4172 4.4172 0 0 1-5.239-.4699zm-.3909-10.472a4.4142 4.4142 0 0 1 2.1085-1.8456l-.0103.0058 3.3531 1.936a.7981.7981 0 0 0 .3992.6914v5.63l-1.7171-.9913a.0152.0152 0 0 1-.0077-.0127V6.3912a4.4172 4.4172 0 0 1 2.99-4.374zm15.42 1.8456a4.4142 4.4142 0 0 1 .3908 2.617l-.0103-.0058-3.3531-1.936a.7981.7981 0 0 0-.7984 0l-4.8757 2.815V4.3026a.0152.0152 0 0 1 .0053-.0133l3.4024-1.9642a4.4172 4.4172 0 0 1 5.239.4699zm.3909 10.472a4.4142 4.4142 0 0 1-2.1085 1.8456l.0103-.0058-3.3531-1.936a.7981.7981 0 0 0-.3992-.6914V8.4111l1.7171.9913a.0152.0152 0 0 1 .0077.0127v3.928a4.4172 4.4172 0 0 1-2.99 4.374zM4.7712 8.4958a4.4273 4.4273 0 0 1 2.4993.7714l-.0103.0058-3.3531 1.936a.7981.7981 0 0 0-.3992.6914V17.53l-1.7171-.9913a.0152.0152 0 0 1-.0077-.0127V12.602a4.4172 4.4172 0 0 1 2.99-4.374z"/>
+                      <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5153-4.9066 6.0462 6.0462 0 0 0-4.4439-2.9147 6.0502 6.0502 0 0 0-5.0637 1.4774 6.058 6.058 0 0 0-4.4463 2.917 6.0547 6.0547 0 0 0 1.474 5.062 6.0506 6.0506 0 0 0-.5157 4.9108 6.0546 6.0546 0 0 0 4.4466 2.9147 6.0585 6.0585 0 0 0 5.061-1.4774 6.0581 6.0581 0 0 0 4.4463-2.917 6.0547 6.0547 0 0 0-1.474-5.062 6.0506 6.0506 0 0 0 .5157-4.9108zm-9.277 12.037a4.4273 4.4273 0 0 1-2.4993-.7714l.0103-.0058 3.3531-1.936a.7981.7981 0 0 0 .3992-.6914V13.567l1.7171.9913a.0152.0152 0 0 1 .0077.0127v3.928a4.4172 4.4172 0 0 1-2.99 4.374zm-9.2811-4.8703a4.417 4.417 0 0 1-.3908-2.617l.0103.0058 3.3531 1.936a.7981.7981 0 0 0 .7984 0l4.8757-2.815v1.9826a.0152.0152 0 0 1-.0053.0133l-3.4024 1.9642a4.4172 4.4172 0 0 1-5.239-.4699zm-.3909-10.472a4.4142 4.4142 0 0 1 2.1085-1.8456l-.0103.0058 3.3531 1.936a.7981.7981 0 0 0 .3992.6914v5.63l-1.7171-.9913a.0152.0152 0 0 1-.0077-.0127V6.3912a4.4172 4.4172 0 0 1 2.99-4.374zm15.42 1.8456a4.4142 4.4142 0 0 1 .3908 2.617l-.0103-.0058-3.3531-1.936a.7981.7981 0 0 0-.7984 0l-4.8757 2.815V4.3026a.0152.0152 0 0 1 .0053-.0133l3.4024-1.9642a4.4172 4.4172 0 0 1 5.239.4699zm.3909 10.472a4.4142 4.4142 0 0 1-2.1085 1.8456l.0103-.0058-3.3531-1.936a.7981.7981 0 0 0-.3992-.6914V8.4111l1.7171.9913a.0152.0152 0 0 1 .0077.0127v3.928a4.4172 4.4172 0 0 1-2.99 4.374zM4.7712 8.4958a4.4273 4.4273 0 0 1 2.4993.7714l-.0103.0058-3.3531 1.936a.7981.7981 0 0 0-.3992.6914V17.53l-1.7171-.9913a.0152.0152 0 0 1-.0077-.0127V12.602a4.4172 4.4172 0 0 1 2.99-4.374z" />
                     </svg>
                   </div>
                   <div>
@@ -286,7 +309,7 @@ const Dashboard: React.FC = () => {
                 </ul>
               </div>
             </div>
-            
+
             <div className="p-8 bg-white/[0.02] border-t border-white/5 text-center">
               <button onClick={() => setShowModelsModal(false)} className="px-8 py-3 rounded-2xl bg-white/5 text-white font-bold hover:bg-white/10 transition-all border border-white/10">
                 Close Details

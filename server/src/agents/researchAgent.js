@@ -19,33 +19,68 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
   const allDocNames = docsMetadata.length > 0 ? docsMetadata.map(d => d.name).join(', ') : 'Workspace Documents';
 
   // 1. Handle Summary / Meta Queries
-  if (isSummary && documentIds.length === 1) {
-    const documentId = documentIds[0];
+  if (isSummary && documentIds.length > 0) {
     const { getCachedResponse, setCachedResponse } = await import('../utils/cache.js');
     const { getAllDocumentContext } = await import('../services/vectorService.js');
     
-    const cacheKey = `cache:full_doc:${documentId}`;
-    let fullDocText = await getCachedResponse(cacheKey);
-    
-    if (!fullDocText) {
-      fullDocText = await getAllDocumentContext(documentId);
-      await setCachedResponse(cacheKey, fullDocText, 86400);
-    }
+    // For single doc, we use cached full content
+    if (documentIds.length === 1) {
+      const documentId = documentIds[0];
+      const cacheKey = `cache:full_doc:${documentId}`;
+      let fullDocText = await getCachedResponse(cacheKey);
+      
+      if (!fullDocText) {
+        fullDocText = await getAllDocumentContext(documentId);
+        await setCachedResponse(cacheKey, fullDocText, 86400);
+      }
 
-    const context = `[SOURCE DOCUMENT: ${allDocNames}]\n\n[FULL CONTENT]\n${fullDocText}`;
-    
-    return {
-      context,
-      confidence: 0.99,
-      alignment: 1,
-      isReliable: true,
-      docNames: allDocNames, // For summaries, we use the specific doc name
-      chunks: ['Analyzed full document from memory cache']
-    };
+      const context = `[SOURCE DOCUMENT: ${allDocNames}]\n\n[FULL CONTENT]\n${fullDocText}`;
+      
+      return {
+        context,
+        confidence: 0.99,
+        alignment: 1,
+        isReliable: true,
+        docNames: allDocNames,
+        chunks: ['Analyzed full document from memory cache']
+      };
+    } else {
+      // For multiple docs, we take a larger sample of chunks (Top 20) to ensure a good summary
+      let queryEmbedding;
+      try {
+        queryEmbedding = await generateEmbedding(question);
+      } catch {
+        return { context: '', confidence: 0, alignment: 0, isReliable: false, docNames: allDocNames, hasMatchedChunks: false, chunks: [] };
+      }
+      const rawResults = await searchVectors(queryEmbedding, documentIds);
+      const topK_Summary = 20;
+      const summaryChunks = rawResults.slice(0, topK_Summary);
+
+      const formatted = summaryChunks.map(item => {
+        const sourceName = docNamesMap[item.docId] || 'Document';
+        return `[SOURCE: ${sourceName}]\n${item.content.trim()}`;
+      }).join('\n\n---\n\n');
+
+      return {
+        context: `[SUMMARY DATA FROM MULTIPLE SOURCES: ${allDocNames}]\n\n${formatted}`,
+        confidence: 0.9,
+        alignment: 1,
+        isReliable: true,
+        docNames: allDocNames,
+        hasMatchedChunks: summaryChunks.length > 0,
+        chunks: summaryChunks.slice(0, 5).map(c => c.content.substring(0, 100))
+      };
+    }
   }
 
   // 2. Vector Search
-  const queryEmbedding = await generateEmbedding(question);
+  let queryEmbedding;
+  try {
+    queryEmbedding = await generateEmbedding(question);
+  } catch {
+    // Embedding failed — return empty context so orchestrator uses general knowledge fallback
+    return { context: '', confidence: 0, alignment: 0, isReliable: false, docNames: allDocNames, hasMatchedChunks: false, chunks: [] };
+  }
   const rawResults = await searchVectors(queryEmbedding, documentIds);
 
   // 3. Dynamic Filtering

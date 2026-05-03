@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/env.js';
-import { buildRAGPrompt, buildStrictRAGPrompt } from '../utils/promptBuilder.js';
+import { buildRAGPrompt, buildStrictRAGPrompt, buildGeneralPrompt } from '../utils/promptBuilder.js';
 import { logger } from '../utils/logger.js';
 import { llmCircuitBreaker } from '../utils/circuitBreaker.js';
 
@@ -44,13 +44,25 @@ export const generateAnswer = async (question, context, model, options = {}) => 
 
     // 2. Add current question with RAG prompt (Selection based on mode)
     const mode = options.mode || 'hybrid';
-    console.log("RAG Mode (Agent):", mode);
+    const contextLength = context?.length || 0;
+    const hasSufficientContext = contextLength > 50;
+
+
 
     let prompt;
     if (mode === 'strict') {
       prompt = buildStrictRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting);
     } else {
-      prompt = buildRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting);
+      // HYBRID MODE LOGIC
+      if (isGreeting) {
+        prompt = buildRAGPrompt(context, question, isDocFound, hasDocuments, true);
+      } else if (hasSufficientContext) {
+
+        prompt = buildRAGPrompt(context, question, isDocFound, hasDocuments, false);
+      } else {
+
+        prompt = buildGeneralPrompt(question, isGreeting);
+      }
     }
 
     chatMessages.push({

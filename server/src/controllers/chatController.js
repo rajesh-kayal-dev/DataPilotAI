@@ -10,8 +10,6 @@ export const handleChat = async (req, res) => {
   const { question, workspaceId, chatId, stream = true, regenerate = false, mode = 'hybrid' } = req.body;
   const userId = req.user?.id;
 
-  console.log("RAG Mode (Request):", mode);
-
   if (!question || !workspaceId) {
     return res.status(400).json({ error: 'Question and Workspace ID are required' });
   }
@@ -20,7 +18,7 @@ export const handleChat = async (req, res) => {
     const Document = (await import('../models/Document.js')).default;
     const docs = await Document.find({ workspaceId, userId, status: 'completed' }).select('_id');
     const targetDocumentIds = docs.map(d => d._id.toString());
-    const history = await getSessionHistory(chatId, userId);
+    const history = await getSessionHistory(chatId, userId, workspaceId);
 
     if (stream) {
       // 1. Set headers for SSE (Server-Sent Events)
@@ -52,7 +50,7 @@ export const handleChat = async (req, res) => {
       if (!fullAnswer && result.answer) fullAnswer = result.answer;
       
       if (regenerate && chatId) {
-        chatSession = await updateLastResponse(chatId, userId, fullAnswer, result);
+        chatSession = await updateLastResponse(chatId, userId, fullAnswer, workspaceId, result);
       } else {
         chatSession = await appendToHistory(chatId, userId, question, fullAnswer, workspaceId, result);
       }
@@ -124,9 +122,12 @@ export const listSessions = async (req, res) => {
  */
 export const getChatSession = async (req, res) => {
   try {
+    const { workspaceId } = req.query;
+    if (!workspaceId) return res.status(400).json({ error: 'Workspace ID is required' });
+
     const Chat = (await import('../models/Chat.js')).default;
-    const chatSession = await Chat.findOne({ _id: req.params.id, user: req.user?.id });
-    if (!chatSession) return res.status(404).json({ error: 'Chat not found' });
+    const chatSession = await Chat.findOne({ _id: req.params.id, user: req.user?.id, workspaceId });
+    if (!chatSession) return res.status(404).json({ error: 'Chat not found in this workspace' });
     return res.json(chatSession);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch chat session' });
@@ -138,17 +139,18 @@ export const getChatSession = async (req, res) => {
  */
 export const updateChatSession = async (req, res) => {
   try {
-    const Chat = (await import('../models/Chat.js')).default;
-    const { title } = req.body;
+    const { title, workspaceId } = req.body;
     if (!title) return res.status(400).json({ error: 'Title is required' });
+    if (!workspaceId) return res.status(400).json({ error: 'Workspace ID is required' });
 
+    const Chat = (await import('../models/Chat.js')).default;
     const chatSession = await Chat.findOneAndUpdate(
-      { _id: req.params.id, user: req.user?.id },
+      { _id: req.params.id, user: req.user?.id, workspaceId },
       { title },
       { new: true }
     );
     
-    if (!chatSession) return res.status(404).json({ error: 'Chat not found' });
+    if (!chatSession) return res.status(404).json({ error: 'Chat not found in this workspace' });
     return res.json(chatSession);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update chat session' });
@@ -160,9 +162,12 @@ export const updateChatSession = async (req, res) => {
  */
 export const deleteChatSession = async (req, res) => {
   try {
+    const { workspaceId } = req.query;
+    if (!workspaceId) return res.status(400).json({ error: 'Workspace ID is required' });
+
     const Chat = (await import('../models/Chat.js')).default;
-    const chatSession = await Chat.findOneAndDelete({ _id: req.params.id, user: req.user?.id });
-    if (!chatSession) return res.status(404).json({ error: 'Chat not found' });
+    const chatSession = await Chat.findOneAndDelete({ _id: req.params.id, user: req.user?.id, workspaceId });
+    if (!chatSession) return res.status(404).json({ error: 'Chat not found in this workspace' });
     return res.json({ success: true, message: 'Chat deleted successfully' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete chat session' });
@@ -177,8 +182,11 @@ export const deleteMessageFromSession = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    const { workspaceId } = req.query;
+    if (!workspaceId) return res.status(400).json({ error: 'Workspace ID is required' });
+
     const { deleteMessage } = await import('../services/historyService.js');
-    await deleteMessage(chatId, userId, messageId);
+    await deleteMessage(chatId, userId, messageId, workspaceId);
     res.json({ success: true, message: 'Message deleted successfully' });
   } catch (err) {
     logger.error('Failed to delete message', { err: err.message, chatId, messageId });

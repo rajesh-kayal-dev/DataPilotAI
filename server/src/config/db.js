@@ -5,19 +5,12 @@ import { logger } from '../utils/logger.js';
  * MongoDB Connection with Auto-Reconnect Logic
  */
 const connectDB = async () => {
-  const options = {
-    autoIndex: true,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-    family: 4 // Use IPv4, skip trying IPv6
-  };
-
   try {
-    await mongoose.connect(process.env.MONGODB_URI, options);
-    logger.info('MongoDB atlas connected successfully');
+    await mongoose.connect(process.env.MONGODB_URI);
+    logger.info('MongoDB connected successfully');
   } catch (error) {
-    logger.error(`Initial MongoDB connection failed: ${error.message}`, { error });
-    setTimeout(connectDB, 5000); // Retry after 5s instead of exiting
+    logger.error('MongoDB connection error:', error.message);
+    process.exit(1);
   }
 };
 

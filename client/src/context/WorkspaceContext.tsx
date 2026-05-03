@@ -155,7 +155,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   useEffect(() => {
-    if (activeWorkspaceId) {
+    if (activeWorkspaceId && activeWorkspaceId !== 'null') {
+      // Clear current session state for isolation
+      setActiveChatId(null);
+      setCurrentChatMessages([]);
+      setCurrentChatTitle('New Chat');
+      
       refreshDocuments();
       refreshChats();
     }
@@ -170,7 +175,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const renameChat = async (chatId: string, title: string) => {
     try {
-      await axiosInstance.patch(`/chat/sessions/${chatId}`, { title });
+      await axiosInstance.patch(`/chat/sessions/${chatId}`, { title, workspaceId: activeWorkspaceId });
       setChats(prev => prev.map(c => c._id === chatId ? { ...c, title } : c));
       if (activeChatId === chatId) {
         setCurrentChatTitle(title);
@@ -183,7 +188,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const deleteChat = async (chatId: string) => {
     try {
-      await axiosInstance.delete(`/chat/sessions/${chatId}`);
+      await axiosInstance.delete(`/chat/sessions/${chatId}?workspaceId=${activeWorkspaceId}`);
       setChats(prev => prev.filter(c => c._id !== chatId));
       if (activeChatId === chatId) {
         setActiveChatId(null);

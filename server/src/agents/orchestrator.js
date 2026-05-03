@@ -19,22 +19,48 @@ export const processChatFlow = async (question, documentIds, userId, options = {
 
   // Ensure documentIds is an array
   const docIdsArray = Array.isArray(documentIds) ? documentIds : (documentIds ? [documentIds] : []);
+  const hasDocuments = docIdsArray.length > 0;
 
   try {
-    // 1. Rate Limiting & Daily Quota
+    // 1. Resolve Mode early for logging and logic
+    const mode = options.mode || config.rag.mode || 'hybrid';
+
+    // 2. Rate Limiting & Daily Quota
     const rateLimit = await checkRateLimit(userId);
     if (!rateLimit.allowed) return { success: false, error: rateLimit.message };
 
-    // 2. Caching (Production Only)
+    // 3. Caching (Production Only)
     const cacheKey = getCacheKey(question, docIdsArray.join(','));
     if (!onStream && !options.regenerate && config.env === 'production') {
       const cached = await getCachedResponse(cacheKey);
       if (cached) return { ...cached, cached: true, responseTime: Date.now() - startTime };
     }
 
-    // 3. Intent Detection
+    // 4. Intent Detection & Logging
     const intent = detectIntent(question);
+    const isSummaryQuery = /summarize|summary|overview|key points|explain document/i.test(question);
     
+    // 4.5 Document-Check Guardrail (Requested Feature)
+    // If user asks for summary/doc analysis but has NOT uploaded any documents
+    const isDocRelatedQuery = intent === 'doc_summary' || isSummaryQuery;
+    if (isDocRelatedQuery && !hasDocuments) {
+      const guardrailMsg = "Sorry, but you are not providing any document. Please upload a document.";
+      logger.info('Guardrail triggered: Doc query without documents', { userId });
+      
+      if (onStream) {
+        onStream(guardrailMsg);
+        return { success: true, answer: guardrailMsg, model: 'system', source: 'System Guardrail' };
+      }
+      
+      return {
+        success: true,
+        answer: guardrailMsg,
+        model: 'system',
+        source: 'System Guardrail'
+      };
+    }
+
+
     if (intent === 'workspace_info' && workspaceId) {
       try {
         const Workspace = (await import('../models/Workspace.js')).default;
@@ -56,11 +82,11 @@ export const processChatFlow = async (question, documentIds, userId, options = {
 
     let docNames = '';
     let hasMatchedChunks = false;
-    const hasDocuments = docIdsArray.length > 0;
 
     let workspaceDocs = [];
     if (hasDocuments) {
-      const retrievalResult = await retrieveContext(question, docIdsArray, intent === 'doc_summary');
+      // For summary queries, we tell the research agent to be more aggressive
+      const retrievalResult = await retrieveContext(question, docIdsArray, isSummaryQuery || intent === 'doc_summary');
       context = retrievalResult.context;
       confidence = retrievalResult.confidence;
       alignment = retrievalResult.alignment;
@@ -68,6 +94,8 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       chunks = retrievalResult.chunks;
       docNames = retrievalResult.docNames;
       hasMatchedChunks = retrievalResult.hasMatchedChunks;
+
+
 
       // Fetch doc metadata for keyword matching
       try {
@@ -79,15 +107,14 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     }
 
     // 5. RAG Mode Logic (Strict vs Hybrid)
-    const mode = options.mode || config.rag.mode || 'hybrid';
-    console.log("RAG Mode (Orchestrator):", mode);
-    
     const isStrict = mode === 'strict';
-    const isDocQuery = intent === 'doc_question' || intent === 'doc_summary';
+    const isDocQuery = intent === 'doc_question' || intent === 'doc_summary' || isSummaryQuery;
 
     // In Strict Mode, we block the LLM if context is unreliable for doc queries
-    if (isStrict && isDocQuery && !isReliable) {
+    // FIX: If it's a summary query AND we have context (even if not "reliable" by vector score), we allow it.
+    if (isStrict && isDocQuery && !isReliable && !isSummaryQuery) {
       const guardrailMsg = "Sorry, I cannot find this information in your document.";
+      logger.info('Strict Mode: Rejection triggered (Unreliable context for non-summary query)');
       if (onStream) onStream(guardrailMsg);
       
       return {
@@ -98,6 +125,13 @@ export const processChatFlow = async (question, documentIds, userId, options = {
         confidence,
         alignment
       };
+    }
+
+    if (isStrict && isDocQuery && (!context || context.length < 50) && !hasDocuments) {
+      logger.info('Strict Mode: Rejection triggered (No context and no documents)');
+       const guardrailMsg = "Sorry, I cannot find this information in your document.";
+       if (onStream) onStream(guardrailMsg);
+       return { success: true, answer: guardrailMsg, model: 'system', source: 'Strict Guardrail' };
     }
 
     // 6. Model Resolution & User Identity

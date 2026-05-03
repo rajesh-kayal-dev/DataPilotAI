@@ -16,7 +16,8 @@ export const detectIntent = (question) => {
     'what was the last thing', 'remember what i said',
     'how can you help', 'what can you do', 'your goal', 'your purpose',
     'help me', 'who can you help', 'can you help', 'how you help',
-    'kisme help kar sakti ho', 'kya kar sakte ho', 'kaise madad karoge'
+    'kisme help kar sakti ho', 'kya kar sakte ho', 'kaise madad karoge',
+    'kaise ho', 'kise ho', 'kya hal hai', 'kya haal hai'
   ];
   if (greetings.some(g => q.includes(g))) return 'greeting';
 

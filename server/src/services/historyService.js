@@ -3,38 +3,47 @@ import { logger } from '../utils/logger.js';
 import Chat from '../models/Chat.js';
 
 /**
- * History Service (Production V1 - Redis Enhanced)
- * Provides ultra-fast chat history retrieval and persistence.
+ * History Service (Production V2 - Redis Resilient)
+ * MongoDB is the source of truth. Redis is a best-effort cache.
  */
 
 const TTL = 3600; // 1 hour session cache
+
+// Best-effort Redis set — never throws
+const tryRedisSet = async (key, value, opts) => {
+  try { await redisClient.set(key, value, opts); } catch { /* no-op */ }
+};
+
+// Best-effort Redis get — returns null on failure
+const tryRedisGet = async (key) => {
+  try { return await redisClient.get(key); } catch { return null; }
+};
 
 /**
  * Get chat history for a session
  * Tries Redis first, falls back to MongoDB
  */
-export const getSessionHistory = async (chatId, userId) => {
+export const getSessionHistory = async (chatId, userId, workspaceId) => {
   if (!chatId) return [];
 
   const cacheKey = `chat_history:${chatId}`;
 
   try {
-    // 1. Try Redis
-    const cached = await redisClient.get(cacheKey);
+    // 1. Try Redis (best-effort)
+    const cached = await tryRedisGet(cacheKey);
     if (cached) {
       return Array.isArray(cached) ? cached.slice(-10) : [];
     }
 
     // 2. Fallback to MongoDB
-    const chatSession = await Chat.findOne({ _id: chatId, user: userId }).select('messages');
+    const chatSession = await Chat.findOne({ _id: chatId, user: userId, workspaceId }).select('messages');
     if (chatSession) {
       const history = chatSession.messages.slice(-10);
-      // Cache in Redis for next time
-      await redisClient.set(cacheKey, history, { ex: TTL });
+      await tryRedisSet(cacheKey, history, { ex: TTL });
       return history;
     }
   } catch (err) {
-    logger.error('History Service Error (Get)', { err: err.message, chatId });
+    logger.error('History Service Error (Get)', { error: err.message });
   }
 
   return [];
@@ -42,15 +51,15 @@ export const getSessionHistory = async (chatId, userId) => {
 
 /**
  * Append messages to history
- * Updates both Redis and MongoDB
+ * Updates MongoDB (guaranteed) then syncs Redis (best-effort)
  */
 export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, workspaceId, metadata = {}) => {
   try {
     const cacheKey = `chat_history:${chatId}`;
     let chatSession;
 
-    const assistantPayload = { 
-      role: 'assistant', 
+    const assistantPayload = {
+      role: 'assistant',
       content: assistantMsg,
       source: metadata.source,
       modelName: metadata.model,
@@ -63,10 +72,9 @@ export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, wor
         chatSession.messages.push({ role: 'user', content: userMsg });
         chatSession.messages.push(assistantPayload);
         await chatSession.save();
-        
-        // Update Redis
+
         const updatedHistory = chatSession.messages.slice(-10);
-        await redisClient.set(cacheKey, updatedHistory, { ex: TTL });
+        await tryRedisSet(cacheKey, updatedHistory, { ex: TTL });
         return chatSession;
       }
     }
@@ -84,29 +92,26 @@ export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, wor
         assistantPayload
       ]
     });
-    
+
     await chatSession.save();
-    // Seed Redis
-    await redisClient.set(`chat_history:${chatSession._id}`, chatSession.messages, { ex: TTL });
-    
+    await tryRedisSet(`chat_history:${chatSession._id}`, chatSession.messages, { ex: TTL });
+
     return chatSession;
   } catch (err) {
-    logger.error('History Service Error (Append)', { err: err.message, chatId });
+    logger.error('History Service Error (Append)', { error: err.message });
     throw err;
   }
 };
 
 /**
- * Update only the last assistant response
- * Used for regeneration
+ * Update only the last assistant response (used for regeneration)
  */
-export const updateLastResponse = async (chatId, userId, newAssistantMsg, metadata = {}) => {
+export const updateLastResponse = async (chatId, userId, newAssistantMsg, workspaceId, metadata = {}) => {
   try {
     const cacheKey = `chat_history:${chatId}`;
-    const chatSession = await Chat.findOne({ _id: chatId, user: userId });
-    
+    const chatSession = await Chat.findOne({ _id: chatId, user: userId, workspaceId });
+
     if (chatSession && chatSession.messages.length > 0) {
-      // Find the last assistant message and update it
       for (let i = chatSession.messages.length - 1; i >= 0; i--) {
         if (chatSession.messages[i].role === 'assistant') {
           chatSession.messages[i].content = newAssistantMsg;
@@ -116,16 +121,14 @@ export const updateLastResponse = async (chatId, userId, newAssistantMsg, metada
           break;
         }
       }
-      
+
       await chatSession.save();
-      
-      // Sync Redis
       const updatedHistory = chatSession.messages.slice(-10);
-      await redisClient.set(cacheKey, updatedHistory, { ex: TTL });
+      await tryRedisSet(cacheKey, updatedHistory, { ex: TTL });
       return chatSession;
     }
   } catch (err) {
-    logger.error('History Service Error (Update)', { err: err.message, chatId });
+    logger.error('History Service Error (Update)', { error: err.message });
     throw err;
   }
 };
@@ -133,22 +136,21 @@ export const updateLastResponse = async (chatId, userId, newAssistantMsg, metada
 /**
  * Delete a specific message from history
  */
-export const deleteMessage = async (chatId, userId, messageId) => {
+export const deleteMessage = async (chatId, userId, messageId, workspaceId) => {
   try {
     const cacheKey = `chat_history:${chatId}`;
-    const chatSession = await Chat.findOne({ _id: chatId, user: userId });
-    
+    const chatSession = await Chat.findOne({ _id: chatId, user: userId, workspaceId });
+
     if (chatSession) {
       chatSession.messages = chatSession.messages.filter(m => m._id.toString() !== messageId);
       await chatSession.save();
-      
-      // Sync Redis
+
       const updatedHistory = chatSession.messages.slice(-10);
-      await redisClient.set(cacheKey, updatedHistory, { ex: TTL });
+      await tryRedisSet(cacheKey, updatedHistory, { ex: TTL });
       return chatSession;
     }
   } catch (err) {
-    logger.error('History Service Error (Delete Message)', { err: err.message, chatId, messageId });
+    logger.error('History Service Error (Delete Message)', { error: err.message });
     throw err;
   }
 };
