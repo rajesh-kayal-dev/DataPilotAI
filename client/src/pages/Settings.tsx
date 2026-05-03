@@ -15,7 +15,7 @@ const Settings: React.FC = () => {
             <p className="text-[#7A6B8A] text-sm">Manage your API keys, model preferences, and workspace configuration</p>
           </div>
 
-          <div className="section-tabs flex gap-2 flex-wrap mb-6 sticky top-0 z-20 bg-[#0C0812]/85 backdrop-blur-lg py-3 border-b border-white/5">
+          <div className="section-tabs flex gap-2 flex-wrap mb-6 sticky top-0 z-20 bg-app/85 backdrop-blur-lg py-3 border-b border-white/5">
             {[
               { id: 'api', label: 'API Keys' },
               { id: 'model', label: 'Model' },
@@ -60,7 +60,7 @@ const Settings: React.FC = () => {
                           type={showKey ? 'text' : 'password'}
                           value={openaiKey}
                           onChange={(e) => setOpenaiKey(e.target.value)}
-                          className="w-full bg-[#0C0812]/60 border border-[#352B44] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#7C4FD4]/55 focus:shadow-[0_0_0_3px_rgba(124,79,212,0.12)]"
+                          className="w-full bg-app/60 border border-[#352B44] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#7C4FD4]/55 focus:shadow-[0_0_0_3px_rgba(124,79,212,0.12)]"
                         />
                         <button
                           onClick={() => setShowKey(!showKey)}
@@ -244,7 +244,7 @@ const Settings: React.FC = () => {
             </div>
           </div>
 
-          <div className="fixed bottom-0 right-0 left-64 md:left-72 py-3.5 px-8 bg-[#07050D]/90 backdrop-blur-lg border-t border-[rgba(124,79,212,0.13)] flex items-center justify-between z-30">
+          <div className="fixed bottom-0 right-0 left-64 md:left-72 py-3.5 px-8 bg-app/90 backdrop-blur-lg border-t border-[rgba(124,79,212,0.13)] flex items-center justify-between z-30">
             <span className="text-xs text-[#352B44] font-body">Changes are saved to your browser</span>
             <div className="flex gap-2.5">
               <button className="px-4 py-2 rounded-lg border border-[rgba(124,79,212,0.18)] text-[#6B5F80] text-sm hover:border-[rgba(124,79,212,0.38)] hover:text-white transition-colors">

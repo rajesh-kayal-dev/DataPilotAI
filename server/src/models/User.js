@@ -52,6 +52,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: 'mimo-flash',
     },
+    ragMode: {
+        type: String,
+        enum: ['hybrid', 'strict'],
+        default: 'hybrid',
+    },
 }, { timestamps: true })
 
 export default mongoose.model("User", userSchema);

@@ -79,14 +79,20 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     }
 
     // 5. RAG Mode Logic (Strict vs Hybrid)
-    const isStrict = config.rag.mode === 'strict';
+    const mode = options.mode || config.rag.mode || 'hybrid';
+    console.log("RAG Mode (Orchestrator):", mode);
+    
+    const isStrict = mode === 'strict';
     const isDocQuery = intent === 'doc_question' || intent === 'doc_summary';
 
     // In Strict Mode, we block the LLM if context is unreliable for doc queries
     if (isStrict && isDocQuery && !isReliable) {
+      const guardrailMsg = "Sorry, I cannot find this information in your document.";
+      if (onStream) onStream(guardrailMsg);
+      
       return {
         success: true,
-        answer: "I could not find enough matching information in your document to answer this accurately.",
+        answer: guardrailMsg,
         model: 'system',
         source: 'Strict Guardrail',
         confidence,
@@ -126,6 +132,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       hasDocuments,
       isGreeting: intent === 'greeting',
       history,
+      mode: mode, // Pass the resolved mode down
       regenerate: options.regenerate
     });
 
@@ -137,12 +144,24 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       answer = `Sorry, but I am not finding anything related in your provided document.\n\n${answer}`;
     }
 
-    // Enhanced source selection: if question mentions a doc name, prioritize it
+    // Enhanced source selection: 
+    // 1. If question mentions a doc name, prioritize it
     const questionLower = question.toLowerCase();
     const docByKeyword = (workspaceDocs || []).filter(d => {
       const baseName = d.name.split('.')[0].toLowerCase();
       return baseName.length > 2 && questionLower.includes(baseName);
     }).map(d => d.name).join(', ');
+
+    // 2. If vector search failed but question contains unique keywords from doc names (aggressive fallback)
+    let docByContentMatch = '';
+    if (!docByKeyword && !isReliable && hasDocuments) {
+      const keywords = questionLower.split(' ').filter(w => w.length > 3);
+      const match = (workspaceDocs || []).find(d => {
+        const nameLower = d.name.toLowerCase();
+        return keywords.some(k => nameLower.includes(k));
+      });
+      if (match) docByContentMatch = match.name;
+    }
 
     const responseTime = Date.now() - startTime;
     const finalPayload = {
@@ -151,11 +170,14 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       model: result.model,
       confidence,
       alignment,
-      source: docByKeyword || ((isReliable || hasMatchedChunks) ? (docNames || 'Document') : 'General Knowledge'),
+      source: docByKeyword || docByContentMatch || ((isReliable || hasMatchedChunks) ? (docNames || 'Document') : 'General Knowledge'),
       responseTime,
       cached: false,
       chunks: chunks.slice(0, 3)
     };
+
+    // Ensure source is never empty for the UI
+    if (!finalPayload.source) finalPayload.source = 'General Knowledge';
 
     // 9. Post-Processing
     if (result.success) {

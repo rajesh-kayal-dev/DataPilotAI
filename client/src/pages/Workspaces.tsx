@@ -246,7 +246,7 @@ const Workspaces: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 px-8 py-5 border-b border-[rgba(124,79,212,0.09)] bg-[#08060E]/60 backdrop-blur-lg flex items-center justify-between">
+      <header className="sticky top-0 z-50 px-8 py-5 border-b border-[rgba(124,79,212,0.09)] bg-app/60 backdrop-blur-lg flex items-center justify-between">
         <Link to="/" className="w-fit">
           <Logo size="lg" />
         </Link>
@@ -277,7 +277,7 @@ const Workspaces: React.FC = () => {
               <div key={s} className="relative z-10 flex flex-col items-center flex-1">
                 <div className={`w-3.5 h-3.5 rounded-full border transition-all duration-300 ${s < step ? 'border-[#7C4FD4] bg-gradient-to-br from-[#7C4FD4] to-[#4F8EF7] shadow-[0_0_10px_rgba(124,79,212,0.4)]' :
                   s === step ? 'border-[#7C4FD4] bg-[#7C4FD4] shadow-[0_0_0_4px_rgba(124,79,212,0.18),0_0_14px_rgba(124,79,212,0.5)] scale-125' :
-                    'border-[#352B44] bg-[#08060E]'
+                    'border-[#352B44] bg-app'
                   }`}>
                   {s < step && <div className="w-1 h-1 rounded-full bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>}
                   {s === step && <div className="w-1 h-1 rounded-full bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>}

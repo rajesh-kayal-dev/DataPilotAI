@@ -28,6 +28,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onUpload, isLoading = fal
     }
   }, [input]);
 
+  // Auto-focus on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
   const toggleListening = () => {
     if (isListening) {
       recognitionRef.current?.stop();

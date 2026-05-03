@@ -56,7 +56,7 @@ const Navbar: React.FC = () => {
   const isPremium = user?.plan === 'pro';
 
   return (
-    <header className="h-16 px-4 md:px-6 flex items-center justify-between w-full border-b border-white/5 shrink-0 relative z-[9999] bg-[#08060E]/50 backdrop-blur-md">
+    <header className="h-16 px-4 md:px-6 flex items-center justify-between w-full border-b border-white/5 shrink-0 relative z-[9999] bg-transparent">
       <div className="flex items-center gap-4">
         <ModelSelector />
         {isPremium && (

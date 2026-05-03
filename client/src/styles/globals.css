@@ -1,7 +1,15 @@
 
 
+@theme {
+  --color-app: #08060E;
+  --color-brand: #a855f7;
+  --color-brand-rgb: 168, 85, 247;
+  --color-glass: rgba(30, 20, 45, 0.45);
+  --color-glassBorder: rgba(255, 255, 255, 0.06);
+}
+
 :root {
-  --app: #0B0612;
+  --app: #08060E;
   --glass: rgba(30, 20, 45, 0.45);
   --glassBorder: rgba(255, 255, 255, 0.06);
   --brand: #a855f7;
@@ -29,21 +37,21 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(circle at center, #110A18 0%, #0B0612 100%);
+  background: radial-gradient(circle at center, #0F081A 0%, #08060E 100%);
 }
 
 .blob {
   position: absolute;
   filter: blur(140px);
   border-radius: 50%;
-  opacity: 0.25;
+  opacity: 0.35;
   animation: float-blob infinite alternate ease-in-out;
 }
 
 .blob-1 {
   width: 55vw;
   height: 55vh;
-  background: #6b21a8;
+  background: #7e22ce;
   top: -15%;
   left: -10%;
   animation-duration: 25s;
@@ -52,7 +60,7 @@ h1, h2, h3, h4, h5, h6 {
 .blob-2 {
   width: 65vw;
   height: 65vh;
-  background: #312e81;
+  background: #3730a3;
   bottom: -20%;
   right: -15%;
   animation-duration: 30s;
@@ -61,11 +69,11 @@ h1, h2, h3, h4, h5, h6 {
 .blob-3 {
   width: 50vw;
   height: 50vh;
-  background: #86198f;
+  background: #a21caf;
   top: 30%;
   left: 25%;
   animation-duration: 35s;
-  opacity: 0.15;
+  opacity: 0.2;
 }
 
 @keyframes float-blob {
@@ -147,7 +155,7 @@ h1, h2, h3, h4, h5, h6 {
   background: radial-gradient(ellipse 70% 55% at 20% 20%, rgba(107, 63, 160, 0.3) 0%, transparent 65%),
               radial-gradient(ellipse 50% 40% at 80% 70%, rgba(79, 142, 247, 0.18) 0%, transparent 60%),
               radial-gradient(ellipse 40% 35% at 60% 10%, rgba(155, 111, 204, 0.15) 0%, transparent 55%),
-              #0C0812;
+              #08060E;
 }
 
 .grid-lines {

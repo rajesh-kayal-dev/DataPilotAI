@@ -24,7 +24,7 @@ const testModel = async (name, modelId) => {
         headers: {
           Authorization: `Bearer ${API_KEY}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://datapilot.ai',
+          'HTTP-Referer': 'http://localhost:5173',
           'X-Title': 'DataPilot AI',
         },
         timeout: 30000,
@@ -52,7 +52,7 @@ const testEmbedModel = async () => {
         headers: {
           Authorization: `Bearer ${API_KEY}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://datapilot.ai',
+          'HTTP-Referer': 'http://localhost:5173',
           'X-Title': 'DataPilot AI',
         },
         timeout: 30000,

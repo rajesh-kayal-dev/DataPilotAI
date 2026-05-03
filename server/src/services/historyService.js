@@ -44,16 +44,24 @@ export const getSessionHistory = async (chatId, userId) => {
  * Append messages to history
  * Updates both Redis and MongoDB
  */
-export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, workspaceId) => {
+export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, workspaceId, metadata = {}) => {
   try {
     const cacheKey = `chat_history:${chatId}`;
     let chatSession;
+
+    const assistantPayload = { 
+      role: 'assistant', 
+      content: assistantMsg,
+      source: metadata.source,
+      modelName: metadata.model,
+      confidence: metadata.confidence
+    };
 
     if (chatId) {
       chatSession = await Chat.findOne({ _id: chatId, user: userId });
       if (chatSession) {
         chatSession.messages.push({ role: 'user', content: userMsg });
-        chatSession.messages.push({ role: 'assistant', content: assistantMsg });
+        chatSession.messages.push(assistantPayload);
         await chatSession.save();
         
         // Update Redis
@@ -73,7 +81,7 @@ export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, wor
       user: userId,
       messages: [
         { role: 'user', content: userMsg },
-        { role: 'assistant', content: assistantMsg }
+        assistantPayload
       ]
     });
     
@@ -92,7 +100,7 @@ export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, wor
  * Update only the last assistant response
  * Used for regeneration
  */
-export const updateLastResponse = async (chatId, userId, newAssistantMsg) => {
+export const updateLastResponse = async (chatId, userId, newAssistantMsg, metadata = {}) => {
   try {
     const cacheKey = `chat_history:${chatId}`;
     const chatSession = await Chat.findOne({ _id: chatId, user: userId });
@@ -102,6 +110,9 @@ export const updateLastResponse = async (chatId, userId, newAssistantMsg) => {
       for (let i = chatSession.messages.length - 1; i >= 0; i--) {
         if (chatSession.messages[i].role === 'assistant') {
           chatSession.messages[i].content = newAssistantMsg;
+          chatSession.messages[i].source = metadata.source;
+          chatSession.messages[i].modelName = metadata.model;
+          chatSession.messages[i].confidence = metadata.confidence;
           break;
         }
       }

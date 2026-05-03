@@ -7,8 +7,10 @@ import { logger } from '../utils/logger.js';
  * Handles standard chat flow with ultra-fast Redis memory.
  */
 export const handleChat = async (req, res) => {
-  const { question, workspaceId, chatId, stream = true, regenerate = false } = req.body;
+  const { question, workspaceId, chatId, stream = true, regenerate = false, mode = 'hybrid' } = req.body;
   const userId = req.user?.id;
+
+  console.log("RAG Mode (Request):", mode);
 
   if (!question || !workspaceId) {
     return res.status(400).json({ error: 'Question and Workspace ID are required' });
@@ -33,6 +35,7 @@ export const handleChat = async (req, res) => {
         workspaceId,
         history,
         regenerate,
+        mode,
         onStream: (chunk) => {
           fullAnswer += chunk;
           res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
@@ -46,10 +49,12 @@ export const handleChat = async (req, res) => {
 
       // 3. Final cleanup and persistence
       let chatSession;
+      if (!fullAnswer && result.answer) fullAnswer = result.answer;
+      
       if (regenerate && chatId) {
-        chatSession = await updateLastResponse(chatId, userId, fullAnswer);
+        chatSession = await updateLastResponse(chatId, userId, fullAnswer, result);
       } else {
-        chatSession = await appendToHistory(chatId, userId, question, fullAnswer, workspaceId);
+        chatSession = await appendToHistory(chatId, userId, question, fullAnswer, workspaceId, result);
       }
       
       // Send final metadata
@@ -67,7 +72,8 @@ export const handleChat = async (req, res) => {
       // Standard non-streaming flow
       const result = await processChatFlow(question, targetDocumentIds, userId, { 
         workspaceId,
-        history 
+        history,
+        mode
       });
       
       if (!result.success) return res.status(500).json(result);

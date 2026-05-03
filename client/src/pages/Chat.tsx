@@ -16,13 +16,20 @@ const Chat: React.FC = () => {
   const { 
     workspaces, documents, activeWorkspaceId, setActiveWorkspaceId, 
     setActiveChatId, refreshDocuments, refreshChats,
-    setCurrentChatMessages, setCurrentChatTitle
+    setCurrentChatMessages, setCurrentChatTitle,
+    ragMode, setRagMode
   } = useWorkspace();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatTitle, setChatTitle] = useState<string>('New Chat');
   const [isLoading, setIsLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isAutoScrollEnabled = useRef(true);
+  const isFirstRender = useRef(true);
+
+
 
   // Sync with global context for Navbar export
   useEffect(() => {
@@ -33,13 +40,36 @@ const Chat: React.FC = () => {
     setCurrentChatTitle(chatTitle);
   }, [chatTitle, setCurrentChatTitle]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    isAutoScrollEnabled.current = true;
+    setShowScrollButton(false);
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
+    if (isAutoScrollEnabled.current) {
+      scrollToBottom('auto');
+    }
+  }, [messages]);
+
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      
+      // If user scrolls up, disable auto-scroll
+      if (!isAtBottom && isAutoScrollEnabled.current) {
+        isAutoScrollEnabled.current = false;
+      }
+      
+      // If user scrolls to bottom, re-enable auto-scroll
+      if (isAtBottom && !isAutoScrollEnabled.current) {
+        isAutoScrollEnabled.current = true;
+      }
+
+      setShowScrollButton(!isAtBottom && scrollHeight > clientHeight + 100);
+    }
+  };
 
   useEffect(() => {
     if (workspaceId && workspaceId !== activeWorkspaceId) {
@@ -111,6 +141,8 @@ const Chat: React.FC = () => {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
+      console.log("Sending Chat Request with Mode:", ragMode);
+
       try {
         if (!activeWorkspaceId || activeWorkspaceId === 'null') {
           throw new Error('No active workspace selected. Please select a workspace from the sidebar.');
@@ -129,7 +161,8 @@ const Chat: React.FC = () => {
             workspaceId: activeWorkspaceId,
             chatId: chatId || undefined,
             stream: true,
-            regenerate: isRegenerate
+            regenerate: isRegenerate,
+            mode: ragMode
           })
         });
 
@@ -293,9 +326,9 @@ const Chat: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-[#08060E]">
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
         {/* Chat Header */}
-        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-[#08060E]/80 backdrop-blur-md z-20">
+        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-transparent z-20">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-brand/20 flex items-center justify-center text-brand">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
@@ -314,10 +347,15 @@ const Chat: React.FC = () => {
               </div>
             </div>
           </div>
+
         </div>
 
         {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto pt-4 pb-32 px-4 md:px-0 scrollbar-hide">
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto pt-4 pb-32 px-4 md:px-0 scrollbar-hide"
+        >
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.length === 0 && !isLoading && (
               <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -369,8 +407,21 @@ const Chat: React.FC = () => {
         </div>
 
         {/* Fixed Chat Input Area */}
-        <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-[#08060E] via-[#08060E] to-transparent z-20">
+        <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-app via-app/80 to-transparent z-20">
           <div className="max-w-3xl mx-auto relative group">
+            {/* ChatGPT Style Scroll to Bottom Button */}
+            {showScrollButton && (
+              <button 
+                onClick={() => scrollToBottom('smooth')}
+                className="absolute -top-16 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-[#343541] border border-white/20 flex items-center justify-center text-white shadow-xl hover:bg-[#40414f] transition-all z-[100] animate-in fade-in zoom-in duration-200"
+                title="Scroll to bottom"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 13l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+
             <div className={isLoading ? 'opacity-70 pointer-events-none' : ''}>
               <ChatInput onSend={handleSend} onUpload={handleUpload} isLoading={isLoading} />
             </div>
@@ -382,6 +433,7 @@ const Chat: React.FC = () => {
             </p>
           </div>
         </div>
+
       </div>
     </MainLayout>
   );

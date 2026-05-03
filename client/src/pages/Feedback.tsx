@@ -93,7 +93,7 @@ const FeedbackPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="flex-1 overflow-y-auto bg-[#08060E] py-12 px-6">
+      <div className="flex-1 overflow-y-auto bg-transparent py-12 px-6">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="mb-12">

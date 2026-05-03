@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
+import ModeModal from '../components/ModeModal';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -8,6 +10,7 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { ragMode, isModeModalOpen, setIsModeModalOpen } = useWorkspace();
 
   return (
     <div className="flex w-full h-screen text-sm antialiased font-sans selection:bg-brand selection:text-white relative bg-app overflow-hidden">
@@ -23,6 +26,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <Navbar />
         {children}
       </div>
+
+      <ModeModal 
+        isOpen={isModeModalOpen} 
+        onClose={() => setIsModeModalOpen(false)} 
+        mode={ragMode} 
+      />
     </div>
   );
 };

@@ -26,7 +26,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     refreshChats,
     createWorkspace,
     updateWorkspace,
-    deleteWorkspace
+    deleteWorkspace,
+    renameChat,
+    deleteChat,
+    ragMode,
+    setRagMode
   } = useWorkspace();
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -59,10 +63,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     e.preventDefault();
     if (!editChatTitle.trim()) return;
     try {
-      await axiosInstance.patch(`/chat/sessions/${id}`, { title: editChatTitle });
+      await renameChat(id, editChatTitle);
       setEditingChatId(null);
       setEditChatTitle('');
-      refreshChats();
+      toast.success('Chat renamed');
     } catch (err) {
       console.error('Failed to update chat', err);
       toast.error('Failed to update chat');
@@ -73,12 +77,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this chat?')) {
       try {
-        await axiosInstance.delete(`/chat/sessions/${id}`);
+        await deleteChat(id);
         toast.success('Chat deleted');
         if (activeChatId === id) {
           navigate(`/chat/${activeWorkspaceId}`);
         }
-        refreshChats();
       } catch (err) {
         console.error('Failed to delete chat', err);
         toast.error('Failed to delete chat');
@@ -375,6 +378,22 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                       !collapsed && <span className="text-sm truncate">{chat.title}</span>
                     )}
                   </div>
+                  {!collapsed && editingChatId !== chat._id && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setEditingChatId(chat._id); setEditChatTitle(chat.title); }}
+                        className="p-1 hover:text-brand text-white/30 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeleteChat(e, chat._id)}
+                        className="p-1 hover:text-red-400 text-white/30 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -404,6 +423,27 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
               <button onClick={() => { navigate('/upgrade'); setProfileOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> <span>Upgrade to Pro</span>
               </button>
+              <div className="h-px bg-white/5 my-1 mx-2"></div>
+              
+              {/* RAG Mode Toggle in Sidebar */}
+              <div className="px-4 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-white/30 font-bold mb-2">Search Mode</div>
+                <div className="flex bg-white/5 p-1 rounded-lg border border-white/5">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setRagMode('hybrid'); }}
+                    className={`flex-1 text-[10px] py-1.5 rounded-md transition-all font-bold ${ragMode === 'hybrid' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-white/40 hover:text-white'}`}
+                  >
+                    Hybrid
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setRagMode('strict'); }}
+                    className={`flex-1 text-[10px] py-1.5 rounded-md transition-all font-bold ${ragMode === 'strict' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-white/40 hover:text-white'}`}
+                  >
+                    Strict
+                  </button>
+                </div>
+              </div>
+
               <div className="h-px bg-white/5 my-1 mx-2"></div>
               <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-400/5 transition-colors">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg> <span>Log out</span>

@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'assistant'], required: true },
-  content: { type: String, required: true },
+  content: { type: String, default: '' },
+  source: { type: String },
+  modelName: { type: String },
+  confidence: { type: Number },
   createdAt: { type: Date, default: Date.now }
 });
 

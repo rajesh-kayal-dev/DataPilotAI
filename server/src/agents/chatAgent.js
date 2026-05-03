@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/env.js';
-import { buildRAGPrompt } from '../utils/promptBuilder.js';
+import { buildRAGPrompt, buildStrictRAGPrompt } from '../utils/promptBuilder.js';
 import { logger } from '../utils/logger.js';
 import { llmCircuitBreaker } from '../utils/circuitBreaker.js';
 
@@ -42,10 +42,20 @@ export const generateAnswer = async (question, context, model, options = {}) => 
     
     chatMessages.push(...historyExchanges);
 
-    // 2. Add current question with RAG prompt
+    // 2. Add current question with RAG prompt (Selection based on mode)
+    const mode = options.mode || 'hybrid';
+    console.log("RAG Mode (Agent):", mode);
+
+    let prompt;
+    if (mode === 'strict') {
+      prompt = buildStrictRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting);
+    } else {
+      prompt = buildRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting);
+    }
+
     chatMessages.push({
       role: 'user',
-      content: buildRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting)
+      content: prompt
     });
 
     const response = await axios.post(
@@ -61,7 +71,7 @@ export const generateAnswer = async (question, context, model, options = {}) => 
         headers: {
           Authorization: `Bearer ${config.openrouter.apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://datapilot.ai',
+          'HTTP-Referer': config.server.frontendUrl || 'http://localhost:5173',
           'X-Title': 'DataPilot AI',
         },
         timeout: config.llm.timeout,
