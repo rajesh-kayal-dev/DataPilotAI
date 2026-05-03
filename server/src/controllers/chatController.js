@@ -1,5 +1,5 @@
+import { getSessionHistory, appendToHistory, updateLastResponse } from '../services/historyService.js';
 import { processChatFlow } from '../agents/orchestrator.js';
-import { getSessionHistory, appendToHistory } from '../services/historyService.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.js';
  * Handles standard chat flow with ultra-fast Redis memory.
  */
 export const handleChat = async (req, res) => {
-  const { question, workspaceId, chatId } = req.body;
+  const { question, workspaceId, chatId, stream = true, regenerate = false } = req.body;
   const userId = req.user?.id;
 
   if (!question || !workspaceId) {
@@ -16,39 +16,77 @@ export const handleChat = async (req, res) => {
 
   try {
     const Document = (await import('../models/Document.js')).default;
-    
-    // 1. Fetch relevant documents in workspace
     const docs = await Document.find({ workspaceId, userId, status: 'completed' }).select('_id');
     const targetDocumentIds = docs.map(d => d._id.toString());
-
-    // 2. Fetch History from Redis (Sub-ms performance)
     const history = await getSessionHistory(chatId, userId);
 
-    // 3. Process the chat with memory
-    const result = await processChatFlow(question, targetDocumentIds, userId, { 
-      workspaceId,
-      history 
-    });
-    
-    if (!result.success) {
-      return res.status(500).json(result);
+    if (stream) {
+      // 1. Set headers for SSE (Server-Sent Events)
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      let fullAnswer = '';
+
+      // 2. Process with onStream callback
+      const result = await processChatFlow(question, targetDocumentIds, userId, { 
+        workspaceId,
+        history,
+        regenerate,
+        onStream: (chunk) => {
+          fullAnswer += chunk;
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        }
+      });
+
+      if (!result.success) {
+        res.write(`data: ${JSON.stringify({ error: result.error })}\n\n`);
+        return res.end();
+      }
+
+      // 3. Final cleanup and persistence
+      let chatSession;
+      if (regenerate && chatId) {
+        chatSession = await updateLastResponse(chatId, userId, fullAnswer);
+      } else {
+        chatSession = await appendToHistory(chatId, userId, question, fullAnswer, workspaceId);
+      }
+      
+      // Send final metadata
+      res.write(`data: ${JSON.stringify({ 
+        done: true, 
+        chatId: chatSession._id, 
+        title: chatSession.title,
+        messages: chatSession.messages, // Include messages with IDs
+        ...result,
+        answer: fullAnswer // Final full answer
+      })}\n\n`);
+      
+      return res.end();
+    } else {
+      // Standard non-streaming flow
+      const result = await processChatFlow(question, targetDocumentIds, userId, { 
+        workspaceId,
+        history 
+      });
+      
+      if (!result.success) return res.status(500).json(result);
+
+      const chatSession = await appendToHistory(chatId, userId, question, result.answer, workspaceId);
+
+      return res.json({
+        ...result,
+        chatId: chatSession._id,
+        title: chatSession.title
+      });
     }
-
-    // 4. Update Persistence (Redis + MongoDB)
-    const chatSession = await appendToHistory(chatId, userId, question, result.answer, workspaceId);
-
-    return res.json({
-      ...result,
-      chatId: chatSession._id,
-      title: chatSession.title
-    });
 
   } catch (error) {
     logger.error('Chat Error (handleChat)', { error: error.message, userId });
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Internal server error' 
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.end();
   }
 };
 
@@ -122,5 +160,22 @@ export const deleteChatSession = async (req, res) => {
     return res.json({ success: true, message: 'Chat deleted successfully' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete chat session' });
+  }
+};
+
+/**
+ * Delete a specific message from a chat session
+ */
+export const deleteMessageFromSession = async (req, res) => {
+  const { chatId, messageId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const { deleteMessage } = await import('../services/historyService.js');
+    await deleteMessage(chatId, userId, messageId);
+    res.json({ success: true, message: 'Message deleted successfully' });
+  } catch (err) {
+    logger.error('Failed to delete message', { err: err.message, chatId, messageId });
+    res.status(500).json({ error: 'Failed to delete message' });
   }
 };

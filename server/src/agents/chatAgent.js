@@ -31,7 +31,7 @@ export const generateAnswer = async (question, context, model, options = {}) => 
     // Add Identity: Tell the AI who the user is
     chatMessages.push({
       role: 'system',
-      content: `You are DataPilot AI, a professional intelligence assistant. You are chatting with ${options.userName || 'a user'}. Always refer to them by their name if appropriate. If they ask about themselves, you have access to their profile: Name: ${options.userName}, Email: ${options.userEmail || 'Not provided'}.`
+      content: `You are DataPilot AI, a professional intelligence assistant. You are chatting with ${options.userName || 'a user'}. Always refer to them by their name if appropriate. If they ask about themselves, you have access to their profile: Name: ${options.userName}, Email: ${options.userEmail || 'Not provided'}.${options.regenerate ? '\n\nIMPORTANT: The user wants an improved and DIFFERENT version of the previous answer. Provide a fresh perspective, refine the depth, and use a slightly different structure to ensure high value.' : ''}`
     });
 
     // Add History
@@ -54,7 +54,7 @@ export const generateAnswer = async (question, context, model, options = {}) => 
         model: selectedModel,
         messages: chatMessages,
         max_tokens: isFallback ? 150 : config.llm.maxTokens,
-        temperature: config.llm.temperature,
+        temperature: options.regenerate ? 0.8 : config.llm.temperature,
         stream: !!onStream,
       },
       {

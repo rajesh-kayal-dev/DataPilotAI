@@ -87,3 +87,57 @@ export const appendToHistory = async (chatId, userId, userMsg, assistantMsg, wor
     throw err;
   }
 };
+
+/**
+ * Update only the last assistant response
+ * Used for regeneration
+ */
+export const updateLastResponse = async (chatId, userId, newAssistantMsg) => {
+  try {
+    const cacheKey = `chat_history:${chatId}`;
+    const chatSession = await Chat.findOne({ _id: chatId, user: userId });
+    
+    if (chatSession && chatSession.messages.length > 0) {
+      // Find the last assistant message and update it
+      for (let i = chatSession.messages.length - 1; i >= 0; i--) {
+        if (chatSession.messages[i].role === 'assistant') {
+          chatSession.messages[i].content = newAssistantMsg;
+          break;
+        }
+      }
+      
+      await chatSession.save();
+      
+      // Sync Redis
+      const updatedHistory = chatSession.messages.slice(-10);
+      await redisClient.set(cacheKey, updatedHistory, { ex: TTL });
+      return chatSession;
+    }
+  } catch (err) {
+    logger.error('History Service Error (Update)', { err: err.message, chatId });
+    throw err;
+  }
+};
+
+/**
+ * Delete a specific message from history
+ */
+export const deleteMessage = async (chatId, userId, messageId) => {
+  try {
+    const cacheKey = `chat_history:${chatId}`;
+    const chatSession = await Chat.findOne({ _id: chatId, user: userId });
+    
+    if (chatSession) {
+      chatSession.messages = chatSession.messages.filter(m => m._id.toString() !== messageId);
+      await chatSession.save();
+      
+      // Sync Redis
+      const updatedHistory = chatSession.messages.slice(-10);
+      await redisClient.set(cacheKey, updatedHistory, { ex: TTL });
+      return chatSession;
+    }
+  } catch (err) {
+    logger.error('History Service Error (Delete Message)', { err: err.message, chatId, messageId });
+    throw err;
+  }
+};

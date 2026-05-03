@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Message from '../components/Message';
 import ChatInput from '../components/ChatInput';
+import AgentThinking from '../components/AgentThinking';
 import axiosInstance from '../utils/axiosInstance';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { toast } from 'react-hot-toast';
@@ -20,6 +21,7 @@ const Chat: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatTitle, setChatTitle] = useState<string>('New Chat');
   const [isLoading, setIsLoading] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Sync with global context for Navbar export
@@ -81,71 +83,193 @@ const Chat: React.FC = () => {
     }
   }, [documents, workspaceId]);
 
-  const handleSend = async (content: string) => {
-    if (!content.trim() || isLoading) return;
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-    const userMsg: ChatMessage = { role: 'user', content };
-    setMessages(prev => Array.isArray(prev) ? [...prev, userMsg] : [userMsg]);
-    setIsLoading(true);
+    const handleSend = async (content: string, isRegenerate = false) => {
+      if (!content.trim()) return;
 
-    try {
-      // 1. Check for documents
-      if (!activeWorkspaceId || activeWorkspaceId === 'null') {
-        throw new Error('No active workspace selected. Please select a workspace from the sidebar.');
+      if (!isRegenerate) {
+        const userMsg: ChatMessage = { role: 'user', content };
+        const assistantMsg: ChatMessage = { role: 'assistant', content: '', animate: false };
+        setMessages(prev => Array.isArray(prev) ? [...prev, userMsg, assistantMsg] : [userMsg, assistantMsg]);
+      } else {
+        // Reset last assistant message content for regeneration
+        setMessages(prev => {
+          const next = [...prev];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === 'assistant') {
+              next[i] = { ...next[i], content: '' };
+              break;
+            }
+          }
+          return next;
+        });
       }
       
-      // 2. Post to chat
-      const res = await axiosInstance.post(`/chat`, { 
-        question: content,
-        workspaceId: activeWorkspaceId,
-        chatId: chatId || undefined
+      setIsLoading(true);
+      setIsThinking(true);
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        if (!activeWorkspaceId || activeWorkspaceId === 'null') {
+          throw new Error('No active workspace selected. Please select a workspace from the sidebar.');
+        }
+        
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/v1/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'token': localStorage.getItem('token') || '',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            question: content,
+            workspaceId: activeWorkspaceId,
+            chatId: chatId || undefined,
+            stream: true,
+            regenerate: isRegenerate
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to send message');
+        }
+
+        if (isRegenerate) {
+          // Replace last assistant message with empty one to reset
+          setMessages(prev => {
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].role === 'assistant') {
+                next[i] = { role: 'assistant', content: '', animate: false };
+                break;
+              }
+            }
+            return next;
+          });
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullAnswer = '';
+        let streamMetadata: any = null;
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  
+                  if (data.chunk) {
+                    setIsThinking(false);
+                    fullAnswer += data.chunk;
+                    setMessages(prev => {
+                      const next = [...prev];
+                      // Update the last assistant message
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i].role === 'assistant') {
+                          next[i] = { ...next[i], content: fullAnswer };
+                          break;
+                        }
+                      }
+                      return next;
+                    });
+                  }
+
+                  if (data.done) {
+                    streamMetadata = data;
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+        }
+
+        if (streamMetadata) {
+          if (streamMetadata.messages) {
+            setMessages(streamMetadata.messages);
+          } else {
+            setMessages(prev => {
+              const next = [...prev];
+              for (let i = next.length - 1; i >= 0; i--) {
+                if (next[i].role === 'assistant') {
+                  next[i] = { 
+                    ...next[i], 
+                    source: streamMetadata.source,
+                    modelName: streamMetadata.model,
+                    confidence: streamMetadata.confidence
+                  };
+                  break;
+                }
+              }
+              return next;
+            });
+          }
+
+          if (!chatId && streamMetadata.chatId) {
+            setChatTitle(streamMetadata.title || 'Chat');
+            await refreshChats();
+            navigate(`/chat/${activeWorkspaceId}/${streamMetadata.chatId}`, { replace: true });
+          }
+        }
+
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log('Stream aborted');
+        } else {
+          console.error('Chat error:', error);
+          const errorMessage = error.message || 'Something went wrong. Please try again.';
+          setMessages((prev) => [
+            ...(Array.isArray(prev) ? prev : []),
+            { role: 'assistant', content: errorMessage, animate: true },
+          ]);
+        }
+      } finally {
+        setIsLoading(false);
+        setIsThinking(false);
+        abortControllerRef.current = null;
+      }
+    };
+
+    const handleStop = () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+
+    const handleRegenerate = async () => {
+      // Use functional state check if needed, but here we just need the last user message
+      setMessages(prev => {
+        const lastUserMsg = [...prev].reverse().find(m => m.role === 'user');
+        if (lastUserMsg) {
+          // We trigger the send logic outside the setter to avoid side effects
+          setTimeout(() => handleSend(lastUserMsg.content, true), 0);
+        }
+        return prev;
       });
-      
-      // Check for explicit backend error messages
-      if (res.data?.success === false && res.data?.error) {
-        throw new Error(res.data.error);
+    };
+
+    const handleDeleteMessage = async (messageId: string) => {
+      if (!chatId) return;
+      try {
+        await axiosInstance.delete(`/chat/sessions/${chatId}/messages/${messageId}`);
+        setMessages(prev => prev.filter(m => m._id !== messageId));
+        toast.success('Message deleted');
+      } catch (err) {
+        console.error('Failed to delete message:', err);
+        toast.error('Failed to delete message');
       }
-
-      let answer = res.data?.answer;
-      
-      // Handle empty results
-      if (!answer || typeof answer !== 'string' || answer.trim() === '') {
-        answer = "I couldn't find relevant information in your documents to answer this question.";
-      } else if (answer.toLowerCase().includes("system busy")) {
-        answer = "The system is currently busy processing your request. Please try again in a moment.";
-      } else if (answer.toLowerCase().includes("information not found")) {
-        answer = "I'm sorry, but I couldn't find any information related to your query in the uploaded documents.";
-      }
-      
-      const assistantMsg: ChatMessage = {
-        role: 'assistant',
-        content: answer,
-        source: res.data?.source,
-        modelName: res.data?.model,
-        confidence: res.data?.confidence,
-        animate: true
-      };
-
-      setMessages(prev => Array.isArray(prev) ? [...prev, assistantMsg] : [assistantMsg]);
-
-      // 3. Update title if first message and navigate to generated chatId
-      if (!chatId && res.data?.chatId) {
-        setChatTitle(res.data.title || 'Chat');
-        await refreshChats(); // Force the Sidebar to immediately show the new chat!
-        navigate(`/chat/${activeWorkspaceId}/${res.data.chatId}`, { replace: true });
-      }
-
-    } catch (error: any) {
-      console.error('Chat error:', error);
-      const errorMessage = error.message || 'Something went wrong. Please try again.';
-      setMessages((prev) => Array.isArray(prev) ? [
-        ...prev,
-        { role: 'assistant', content: errorMessage, animate: true },
-      ] : [{ role: 'assistant', content: errorMessage, animate: true }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
   const handleUpload = async (file: File) => {
     if (!activeWorkspaceId || activeWorkspaceId === 'null') {
@@ -210,8 +334,27 @@ const Chat: React.FC = () => {
                   {msg.role === 'user' ? 'You' : 'AI Assistant'}
                 </span>
                 <div className="w-full">
-                  <Message role={msg.role} content={msg.content} source={msg.source} animate={msg.animate} />
+                  <Message 
+                    role={msg.role} 
+                    content={msg.content} 
+                    source={msg.source} 
+                    animate={msg.animate}
+                    isLast={idx === messages.length - 1}
+                    isLoading={isLoading}
+                    onRegenerate={handleRegenerate}
+                    onStop={handleStop}
+                    onDelete={handleDeleteMessage}
+                    id={msg._id}
+                  />
                 </div>
+
+                {/* Multi-Agent Thinking Trace */}
+                {isThinking && msg.role === 'assistant' && msg.content === '' && (
+                  <div className="mt-4 w-full animate-in fade-in slide-in-from-top-2 duration-500">
+                    <AgentThinking />
+                  </div>
+                )}
+
                 {msg.role === 'assistant' && (msg.modelName || msg.confidence !== undefined) && (
                   <div className="px-1 text-[10px] text-white/40 flex items-center gap-3">
                     {msg.modelName && <span>Model: {msg.modelName}</span>}
@@ -220,18 +363,7 @@ const Chat: React.FC = () => {
                 )}
               </div>
             ))}
-            {isLoading && (
-              <div className="flex justify-start mb-4">
-                <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-brand rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-xs text-white/50">Thinking...</span>
-                </div>
-              </div>
-            )}
+
             <div ref={messagesEndRef} />
           </div>
         </div>

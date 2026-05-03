@@ -27,7 +27,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
 
     // 2. Caching (Production Only)
     const cacheKey = getCacheKey(question, docIdsArray.join(','));
-    if (!onStream && config.env === 'production') {
+    if (!onStream && !options.regenerate && config.env === 'production') {
       const cached = await getCachedResponse(cacheKey);
       if (cached) return { ...cached, cached: true, responseTime: Date.now() - startTime };
     }
@@ -125,7 +125,8 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       isDocFound: intent === 'doc_summary' || isReliable,
       hasDocuments,
       isGreeting: intent === 'greeting',
-      history
+      history,
+      regenerate: options.regenerate
     });
 
     // 8. Result Packaging
