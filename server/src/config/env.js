@@ -41,7 +41,7 @@ export const config = {
 
   rag: {
     mode: process.env.RAG_MODE || 'strict', // Added RAG_MODE support
-    threshold: parseFloat(process.env.RAG_THRESHOLD) || 0.45,
+    threshold: parseFloat(process.env.RAG_THRESHOLD) || 0.65,
     alignment: parseFloat(process.env.RAG_ALIGNMENT_THRESHOLD) || 0.35,
     topK: parseInt(process.env.RAG_TOP_K) || 5,
     minChars: 150
@@ -51,7 +51,8 @@ export const config = {
     timeout: parseInt(process.env.LLM_TIMEOUT) || 20000,
     retries: parseInt(process.env.MAX_RETRIES) || 3,
     maxTokens: parseInt(process.env.MAX_TOKENS) || 500,
-    temperature: parseFloat(process.env.TEMPERATURE) || 0.2
+    temperature: parseFloat(process.env.TEMPERATURE) || 0.1,
+    topP: parseFloat(process.env.TOP_P) || 0.2
   },
 
   openrouter: {
@@ -61,5 +62,15 @@ export const config = {
     chatModel: process.env.CHAT_MODEL,
     smartModel: process.env.SMART_MODEL,
     fallbackModel: process.env.FALLBACK_MODEL
+  },
+
+  freemodel: {
+    apiKey: process.env.FREEMODEL_API_KEY,
+    baseUrl: process.env.FREEMODEL_BASE_URL || 'https://cc.freemodel.dev'
+  },
+
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY,
+    baseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com'
   }
 };

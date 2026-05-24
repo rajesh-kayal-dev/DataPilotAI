@@ -1,6 +1,6 @@
 import express from 'express';
 import upload from '../middlewares/uploadMiddleware.js';
-import { handleUpload, getDocumentStatus, chatWithDocument, getDocuments, handleDeleteDocument, handleCancelUpload } from '../controllers/documentController.js';
+import { handleUpload, getDocumentStatus, chatWithDocument, getDocuments, handleDeleteDocument, handleCancelUpload, handleReembed } from '../controllers/documentController.js';
 import { procted } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -12,6 +12,7 @@ const router = express.Router();
 
 router.get('/', procted, getDocuments);
 router.post('/upload', procted, upload.single('document'), handleUpload);
+router.post('/:id/reembed', procted, handleReembed);
 router.get('/:id/download', procted, (req, res, next) => {
   // Pass workspaceId from query if needed for isolation check
   next();

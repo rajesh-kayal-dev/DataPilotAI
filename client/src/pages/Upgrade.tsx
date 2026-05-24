@@ -61,7 +61,7 @@ const Upgrade: React.FC = () => {
       features: [
         'Unlimited Workspaces',
         '50 PDF uploads',
-        'Premium Models (GPT-4o, Claude 3.5)',
+        'Premium Models (GPT-4o, Claude Sonnet/Opus)',
         'Advanced RAG Intelligence',
         'Unlimited messages',
         'Priority Processing'

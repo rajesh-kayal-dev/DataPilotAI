@@ -30,7 +30,8 @@ export const detectIntent = (question) => {
     'summary', 'summarize', 'about this document', 'what is this document', 
     'explain this document', 'overview', 'what is about', 'document about',
     'what is this pdf', 'tell me about', 'describe this', 'docment', 'docoment', 'documnet', 'what is my',
-    'topic', 'topics'
+    'topic', 'topics', 'what can i ask', 'what question', 'question can i ask', 'what should i ask',
+    'what type', 'what kind of question', 'suggest me question', 'helpful question',
   ];
   if (summaryKeywords.some(k => q.includes(k))) return 'doc_summary';
 

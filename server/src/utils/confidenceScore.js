@@ -36,11 +36,14 @@ export const calculateConfidence = (question, chunks) => {
                      (consistencyScore * 0.2) + 
                      (alignmentScore * 0.25);
 
-  // Relaxed Thresholds for better UX:
-  // We want to avoid saying "I don't know" too often if there is decent context.
+  // Relaxed thresholds with reranking boost:
+  // - Normal path: finalScore >= 0.25 or strong alignment + decent vector
+  // - Fallback path: if chunks exist (even low-scored), trust them
+  const hasAnyContent = chunks.length > 0 && combinedText.trim().length > 50;
+  const isReliable = hasAnyContent && (finalScore >= 0.15 || alignmentScore >= 0.2 || vectorScore >= 0.3);
   return {
     score: parseFloat(finalScore.toFixed(2)),
     alignment: parseFloat(alignmentScore.toFixed(2)),
-    isReliable: finalScore >= 0.30 && alignmentScore >= 0.20 
+    isReliable,
   };
 };

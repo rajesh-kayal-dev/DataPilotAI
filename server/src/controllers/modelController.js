@@ -55,7 +55,7 @@ export const setUserModel = async (req, res) => {
 
     // Invalidate Redis cache (best-effort)
     const { redisClient } = await import('../config/redis.js');
-    await safeRedisDel(redisClient, `user_model_info:${userId}`);
+    await safeRedisDel(redisClient, `user_model_id:${userId}`);
 
     res.json({ success: true, selectedModel: modelId, model: entry.model });
   } catch (err) {
@@ -64,36 +64,39 @@ export const setUserModel = async (req, res) => {
   }
 };
 
-// GET /api/user/model — get user's currently selected model
+// GET /api/user/model — get user's currently selected model (plan always fresh from DB)
 export const getUserModel = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // 1. Try Redis first (best-effort)
-    const { redisClient } = await import('../config/redis.js');
-    const cached = await safeRedisGet(redisClient, `user_model_info:${userId}`);
-    if (cached) {
-      try {
-        return res.json(typeof cached === 'object' ? cached : JSON.parse(cached));
-      } catch {
-        await safeRedisDel(redisClient, `user_model_info:${userId}`);
-      }
-    }
-
-    // 2. Fallback to Mongo
+    // Always fetch plan from database so premium unlocks instantly
     const user = await User.findById(userId).select('selectedModel plan');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const modelId = user.selectedModel || DEFAULT_MODEL_ID;
+    // Try cached modelId (plan excluded from cache to avoid stale lock)
+    const { redisClient } = await import('../config/redis.js');
+    const cached = await safeRedisGet(redisClient, `user_model_id:${userId}`);
+    let modelId = user.selectedModel;
+
+    if (!modelId && cached) {
+      try {
+        modelId = typeof cached === 'object' ? cached.modelId : JSON.parse(cached).modelId;
+      } catch {
+        await safeRedisDel(redisClient, `user_model_id:${userId}`);
+      }
+    }
+
+    if (!modelId) modelId = user.selectedModel || DEFAULT_MODEL_ID;
+
     const response = {
       modelId,
       model: resolveModel(modelId),
       plan: user.plan || 'free',
     };
 
-    // 3. Cache for 1 hour (best-effort)
-    await safeRedisSet(redisClient, `user_model_info:${userId}`, JSON.stringify(response), { ex: 3600 });
+    // Cache only modelId (1 hour best-effort) — plan always fresh
+    await safeRedisSet(redisClient, `user_model_id:${userId}`, JSON.stringify({ modelId }), { ex: 3600 });
 
     res.json(response);
   } catch (err) {

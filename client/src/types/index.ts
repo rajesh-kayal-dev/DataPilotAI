@@ -43,6 +43,9 @@ export interface Model {
   tier: string;
   tags: string[];
   badge?: string;
+  apiProvider?: string;
+  configured?: boolean;
+  fallbackId?: string;
 }
 
 export interface GroupedModels {

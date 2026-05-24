@@ -111,6 +111,14 @@ export const verifyPayment = async (req, res) => {
 
             await user.save();
 
+            // 2.5 Invalidate Redis cache so plan reflects immediately
+            try {
+                const { redisClient } = await import('../config/redis.js');
+                await redisClient.del(`user_model_id:${user._id}`);
+            } catch (cacheErr) {
+                // non-blocking
+            }
+
             // 3. Send success email
             try {
                 const planName = PLAN_NAMES[planId] || 'Premium';

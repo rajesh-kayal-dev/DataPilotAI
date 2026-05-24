@@ -83,19 +83,59 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
   }
   const rawResults = await searchVectors(queryEmbedding, documentIds);
 
-  // 3. Dynamic Filtering
-  const threshold = config.rag.threshold;
-  let filtered = rawResults.filter(item => item.score >= threshold);
-  let finalChunks = filtered.slice(0, config.rag.topK);
-  
-  // 4. Global Context Injection (Theme)
+  // 3. Two-Tier Dynamic Filtering + Reranking
+  // Tier 1: Strict threshold (config.rag.threshold = 0.65)
+  // Tier 2: Loose threshold (0.4) — prevents false rejections when chunks are relevant but scored lower
+  const strictThreshold = config.rag.threshold;
+  const looseThreshold = 0.3;
+  let candidates = rawResults.filter(item => item.score >= looseThreshold);
+  let finalChunks = [];
+
+  if (candidates.length > 0) {
+    // Rerank ALL candidates by combined vector + semantic alignment
+    const { calculateAlignment } = await import('../utils/alignmentCheck.js');
+    const reranked = candidates.map(chunk => {
+      const alignmentScore = calculateAlignment(question, [chunk]);
+      const rerankScore = (chunk.score * 0.4) + (alignmentScore * 0.6);
+      return { ...chunk, alignmentScore, rerankScore };
+    });
+    reranked.sort((a, b) => b.rerankScore - a.rerankScore);
+
+    // Take topK, preferring chunks above strict threshold
+    const highQuality = reranked.filter(c => c.score >= strictThreshold);
+    const lowQuality = reranked.filter(c => c.score < strictThreshold);
+
+    if (highQuality.length >= config.rag.topK) {
+      finalChunks = highQuality.slice(0, config.rag.topK);
+    } else {
+      // Mix high + low quality, but penalize low-quality chunk scores for confidence
+      finalChunks = [...highQuality, ...lowQuality].slice(0, config.rag.topK);
+    }
+
+    const avgRerank = finalChunks.reduce((s, c) => s + c.rerankScore, 0) / finalChunks.length;
+    const avgVector = finalChunks.reduce((s, c) => s + c.score, 0) / finalChunks.length;
+    const belowThreshold = finalChunks.filter(c => c.score < strictThreshold).length;
+    console.log(`Rerank: ${finalChunks.length} chunks (${belowThreshold} below ${strictThreshold}), avg vector=${avgVector.toFixed(3)}, avg rerank=${avgRerank.toFixed(3)}`);
+  }
+
+  // 5b. Last-resort fallback: use raw top results (no threshold) if filtering got nothing
+  if (finalChunks.length === 0 && rawResults.length > 0) {
+    finalChunks = rawResults.slice(0, config.rag.topK).map(c => ({
+      ...c,
+      alignmentScore: 0,
+      rerankScore: c.score,
+    }));
+    console.log(`Fallback: using top ${finalChunks.length} raw results (lowest score: ${finalChunks[finalChunks.length-1].score.toFixed(3)})`);
+  }
+
+  // 5. Global Context Injection (Theme)
   const globalChunks = rawResults.filter(item => item.chunkIndex === 0 || item.chunkIndex === 1);
   const themeContext = globalChunks.length > 0 ? globalChunks[0].content : '';
 
-  // 5. Confidence Calculation
+  // 6. Confidence Calculation
   const confidence = calculateConfidence(question, finalChunks);
 
-  // 6. Source Attribution: Get only the unique names of documents that provided chunks
+  // 7. Source Attribution: Get only the unique names of documents that provided chunks
   const matchedDocIds = [...new Set(finalChunks.map(item => item.docId))];
   const matchedDocNames = matchedDocIds.length > 0 
     ? matchedDocIds.map(id => docNamesMap[id]).filter(Boolean).join(', ')

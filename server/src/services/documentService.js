@@ -1,3 +1,6 @@
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import Tesseract from 'tesseract.js';
+import { createCanvas } from 'canvas';
 import Document from '../models/Document.js';
 import { generateEmbedding } from './embeddingService.js';
 import { insertVectors, deleteVectorsByDocId } from './vectorService.js';
@@ -20,6 +23,29 @@ const streamToBuffer = async (stream) => {
     stream.on('error', (err) => reject(err));
     stream.on('end', () => resolve(Buffer.concat(chunks)));
   });
+};
+
+const extractWithOCR = async (dataBuffer) => {
+  const uint8 = new Uint8Array(dataBuffer);
+  const doc = await pdfjsLib.getDocument({ data: uint8, useWorkerFetch: false, disableWorker: true }).promise;
+  let fullText = '';
+
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const viewport = page.getViewport({ scale: 2.0 });
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const ctx = canvas.getContext('2d');
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const pngBuffer = canvas.toBuffer('image/png');
+    const { data } = await Tesseract.recognize(pngBuffer, 'eng', {
+      logger: () => {},
+    });
+    fullText += data.text + '\n\n';
+  }
+
+  return fullText.trim();
 };
 
 export const uploadDocument = async (file, userId, workspaceId) => {
@@ -46,6 +72,74 @@ export const uploadDocument = async (file, userId, workspaceId) => {
   }
 };
 
+const chunkAndEmbed = async (documentId, text) => {
+  text = text.replace(/-\s*\n/g, "").replace(/\r\n/g, "\n").trim();
+
+  const CHUNK_SIZE = 700;
+  const CHUNK_OVERLAP = 120;
+  const chunks = [];
+
+  const separators = ["\n\n", "\n", ". ", " "];
+
+  const splitText = (input, size, overlap) => {
+    let result = [];
+    let paragraphs = input.split(separators[0]);
+    let currentChunk = "";
+    for (let p of paragraphs) {
+      if ((currentChunk + p).length <= size) {
+        currentChunk += (currentChunk ? "\n\n" : "") + p;
+      } else {
+        if (currentChunk) result.push(currentChunk);
+        if (p.length > size) {
+          let lines = p.split(separators[1]);
+          let lineChunk = "";
+          for (let l of lines) {
+            if ((lineChunk + l).length <= size) {
+              lineChunk += (lineChunk ? "\n" : "") + l;
+            } else {
+              if (lineChunk) result.push(lineChunk);
+              lineChunk = l;
+            }
+          }
+          currentChunk = lineChunk;
+        } else {
+          currentChunk = p;
+        }
+      }
+    }
+    if (currentChunk) result.push(currentChunk);
+    return result;
+  };
+
+  const finalChunks = splitText(text, CHUNK_SIZE, CHUNK_OVERLAP);
+  finalChunks.forEach(c => {
+    if (c.trim().length > 40) chunks.push(c.trim());
+  });
+
+  const CONCURRENCY_LIMIT = 5;
+  const points = [];
+  for (let i = 0; i < chunks.length; i += CONCURRENCY_LIMIT) {
+    const batch = chunks.slice(i, i + CONCURRENCY_LIMIT);
+    const batchPromises = batch.map(async (chunk, index) => {
+      const actualIndex = i + index;
+      const embedding = await generateEmbedding(chunk);
+      return {
+        id: uuidv4(),
+        vector: embedding,
+        payload: {
+          docId: documentId.toString(),
+          content: chunk,
+          chunkIndex: actualIndex,
+        },
+      };
+    });
+    const batchResults = await Promise.all(batchPromises);
+    points.push(...batchResults);
+  }
+
+  await insertVectors(points);
+};
+
 export const processDocument = async (documentId) => {
   const document = await Document.findById(documentId);
   if (!document) throw new Error('Document not found');
@@ -59,95 +153,78 @@ export const processDocument = async (documentId) => {
     // 2. Extract Text from S3
     const s3Stream = await getFileFromS3(document.s3Key);
     const dataBuffer = await streamToBuffer(s3Stream);
-    
+
     let text = '';
     if (document.type === 'pdf') {
       const pdfData = await pdfParse(dataBuffer);
-      text = pdfData.text;
+      text = pdfData.text?.trim() || '';
+      if (!text || text.length < 20) {
+        console.log('No selectable text, running OCR...');
+        text = await extractWithOCR(dataBuffer);
+      }
     } else {
       text = dataBuffer.toString('utf8');
     }
 
     if (!text || text.trim().length < 20) throw new Error('No readable text found in document');
 
-    // 3. Clean & Chunking
-    text = text.replace(/-\s*\n/g, "").replace(/\r\n/g, "\n").trim();
-    
-    const CHUNK_SIZE = 1000;
-    const CHUNK_OVERLAP = 200;
-    const chunks = [];
-    
-    const separators = ["\n\n", "\n", ". ", " "];
-    
-    const splitText = (input, size, overlap) => {
-      let result = [];
-      let paragraphs = input.split(separators[0]);
-      let currentChunk = "";
-      for (let p of paragraphs) {
-        if ((currentChunk + p).length <= size) {
-          currentChunk += (currentChunk ? "\n\n" : "") + p;
-        } else {
-          if (currentChunk) result.push(currentChunk);
-          if (p.length > size) {
-            let lines = p.split(separators[1]);
-            let lineChunk = "";
-            for (let l of lines) {
-              if ((lineChunk + l).length <= size) {
-                lineChunk += (lineChunk ? "\n" : "") + l;
-              } else {
-                if (lineChunk) result.push(lineChunk);
-                lineChunk = l;
-              }
-            }
-            currentChunk = lineChunk;
-          } else {
-            currentChunk = p;
-          }
-        }
-      }
-      if (currentChunk) result.push(currentChunk);
-      return result;
-    };
-
-    const finalChunks = splitText(text, CHUNK_SIZE, CHUNK_OVERLAP);
-    finalChunks.forEach(c => {
-      if (c.trim().length > 40) chunks.push(c.trim());
-    });
-
-    // 4. Create Embeddings & Index
-    const CONCURRENCY_LIMIT = 5;
-    const points = [];
-    for (let i = 0; i < chunks.length; i += CONCURRENCY_LIMIT) {
-      const batch = chunks.slice(i, i + CONCURRENCY_LIMIT);
-      const batchPromises = batch.map(async (chunk, index) => {
-        const actualIndex = i + index;
-        const embedding = await generateEmbedding(chunk);
-        return {
-          id: uuidv4(),
-          vector: embedding,
-          payload: {
-            docId: documentId.toString(),
-            content: chunk,
-            chunkIndex: actualIndex,
-          },
-        };
-      });
-      const batchResults = await Promise.all(batchPromises);
-      points.push(...batchResults);
-    }
-
-    // 5. Save to Vector DB
-    await insertVectors(points);
+    // 3. Chunk & Embed
+    await chunkAndEmbed(documentId, text);
 
     await Document.findByIdAndUpdate(documentId, { status: 'completed' });
-    console.log('Your document has been uploaded'); 
+    console.log('Your document has been uploaded');
     return { success: true };
 
   } catch (error) {
-    await Document.findByIdAndUpdate(documentId, { 
+    await Document.findByIdAndUpdate(documentId, {
       status: 'failed',
       $inc: { retryCount: 1 },
-      lastError: error.message 
+      lastError: error.message
+    });
+    throw error;
+  }
+};
+
+export const reembedDocument = async (documentId) => {
+  const document = await Document.findById(documentId);
+  if (!document) throw new Error('Document not found');
+
+  try {
+    await Document.findByIdAndUpdate(documentId, { status: 'processing', lastError: null });
+
+    // 1. Clear old vectors
+    await deleteVectorsByDocId(documentId);
+
+    // 2. Get text from S3 (reuse existing file)
+    const s3Stream = await getFileFromS3(document.s3Key);
+    const dataBuffer = await streamToBuffer(s3Stream);
+
+    let text = '';
+    if (document.type === 'pdf') {
+      const pdfData = await pdfParse(dataBuffer);
+      text = pdfData.text?.trim() || '';
+      if (!text || text.length < 20) {
+        console.log('No selectable text, running OCR...');
+        text = await extractWithOCR(dataBuffer);
+      }
+    } else {
+      text = dataBuffer.toString('utf8');
+    }
+
+    if (!text || text.trim().length < 20) throw new Error('No readable text found in document');
+
+    // 3. Chunk & Embed
+    await chunkAndEmbed(documentId, text);
+
+    await Document.findByIdAndUpdate(documentId, { status: 'completed' });
+    console.log('Document re-embedded successfully');
+    return { success: true };
+
+  } catch (error) {
+    await Document.findByIdAndUpdate(documentId, {
+      status: 'failed',
+      $inc: { retryCount: 1 },
+      lastError: error.message
     });
     throw error;
   }

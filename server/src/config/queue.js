@@ -1,16 +1,39 @@
 import { Queue } from 'bullmq';
 import { redisClient } from './redis.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Background Job Queues (BullMQ)
  * Offloads document processing (chunking/embedding) to workers.
+ * Falls back to synchronous processing if Redis is unavailable.
  */
 
-export const documentQueue = new Queue('document-processing', {
-  connection: process.env.REDIS_URL || 'redis://127.0.0.1:6379'
-});
+let documentQueue = null;
+let queueReady = false;
+
+function initQueue() {
+  const redisUrl = process.env.REDIS_URL;
+  // BullMQ requires a TCP Redis connection (Upstash REST API is not compatible)
+  if (!redisUrl) {
+    logger.info('BullMQ queue disabled - no REDIS_URL (TCP Redis) configured. Documents processed synchronously.');
+    return;
+  }
+  documentQueue = new Queue('document-processing', {
+    connection: redisUrl
+  });
+  queueReady = true;
+  logger.info('BullMQ queue initialized');
+}
+
+initQueue();
 
 export const addDocumentJob = async (data) => {
+  if (!queueReady) {
+    logger.info('Processing document synchronously (queue unavailable)');
+    const { processDocument } = await import('../services/documentService.js');
+    await processDocument(data.documentId);
+    return;
+  }
   await documentQueue.add('process-pdf', data, {
     attempts: 3,
     backoff: {

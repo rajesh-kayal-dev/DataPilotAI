@@ -30,7 +30,7 @@ class CircuitBreaker {
       return result;
     } catch (error) {
       this.onFailure(error);
-      return fallback();
+      return fallback(error);
     }
   }
 

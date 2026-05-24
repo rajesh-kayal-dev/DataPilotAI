@@ -6,7 +6,7 @@ import { checkRateLimit } from '../utils/rateLimiter.js';
 import { getCacheKey, getCachedResponse, setCachedResponse } from '../utils/cache.js';
 import { trackMetrics } from '../utils/analytics.js';
 import { logger } from '../utils/logger.js';
-import { isValidModel, resolveModel } from '../config/modelRegistry.js';
+import { isValidModel, resolveModel, getModelApiProvider, DEFAULT_MODEL_ID } from '../config/modelRegistry.js';
 import User from '../models/User.js';
 
 /**
@@ -136,6 +136,8 @@ export const processChatFlow = async (question, documentIds, userId, options = {
 
     // 6. Model Resolution & User Identity
     let modelId;
+    let userSelectedModelId = null;
+    let apiProvider = 'openrouter';
     let userName = 'User';
     let userEmail = '';
 
@@ -145,15 +147,16 @@ export const processChatFlow = async (question, documentIds, userId, options = {
         userName = user.name || 'User';
         userEmail = user.email || '';
         if (user.selectedModel && isValidModel(user.selectedModel)) {
+          userSelectedModelId = user.selectedModel;
           modelId = resolveModel(user.selectedModel);
+          apiProvider = getModelApiProvider(user.selectedModel);
         }
       }
     }
 
     if (!modelId) {
-      if (intent === 'doc_summary') modelId = config.openrouter.smartModel;
-      else if (question.length < 50) modelId = config.openrouter.fastModel;
-      else modelId = config.openrouter.chatModel;
+      modelId = resolveModel(DEFAULT_MODEL_ID);
+      apiProvider = getModelApiProvider(DEFAULT_MODEL_ID);
     }
 
     // 7. Generation
@@ -162,6 +165,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       userId,
       userName,
       userEmail,
+      apiProvider,
       isDocFound: intent === 'doc_summary' || isReliable,
       hasDocuments,
       isGreeting: intent === 'greeting',
@@ -171,7 +175,26 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     });
 
     // 8. Result Packaging
-    let answer = result.success ? result.answer : result.error;
+    let answer = result.success ? (result.answer || '').trim() : result.error;
+    if (answer) {
+      answer = answer.replace(/^Understood,\s*strict\s*mode[.,!]?\s*/i, '');
+      answer = answer.replace(/^Strict\s*mode[.,!]?\s*/i, '');
+      answer = answer.replace(/^As an? strict\s*mode\s+assistant[.,!]?\s*/i, '');
+      // Strip HTML tags that leak from LLM output
+      answer = answer.replace(/<br\s*\/?>/gi, '\n');
+      answer = answer.replace(/<[^>]+>/g, '');
+      // Strip markdown table pipes — tables render as broken text
+      answer = answer.replace(/^\|.+/gm, '');
+    }
+    // Guardrail: empty answer from LLM — provide fallback
+    if (!answer && result.success) {
+      logger.warn('Empty LLM response, using fallback', { userId, model: modelId, intent, hasDocuments });
+      if (hasDocuments) {
+        answer = "I could not find a clear answer in the uploaded document. Please try rephrasing your question or check if the document contains the relevant information.";
+      } else {
+        answer = "I'm not sure about that. Could you please provide more details or upload a document so I can help better?";
+      }
+    }
     const isHybridGeneral = result.success && hasDocuments && !isReliable && intent !== 'greeting';
     
     if (isHybridGeneral) {

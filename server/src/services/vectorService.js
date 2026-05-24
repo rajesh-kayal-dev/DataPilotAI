@@ -11,14 +11,18 @@ import { logger } from '../utils/logger.js';
 const client = new QdrantClient({
   url: config.qdrant.url,
   apiKey: config.qdrant.apiKey,
+  checkCompatibility: false,
 });
 
 const COLLECTION_NAME = config.qdrant.collection;
+
+let qdrantAvailable = true;
 
 /**
  * Ensures the Qdrant collection exists and payload indexes are configured.
  */
 export const ensureCollection = async () => {
+  if (!qdrantAvailable) return;
   try {
     const collections = await client.getCollections();
     const exists = collections?.collections?.some(c => c.name === COLLECTION_NAME);
@@ -42,7 +46,8 @@ export const ensureCollection = async () => {
     });
 
   } catch (error) {
-    // Silently continue if index already exists
+    qdrantAvailable = false;
+    logger.error('Qdrant unavailable - RAG features disabled', { error: error.message, url: config.qdrant.url });
   }
 };
 
@@ -50,15 +55,23 @@ export const ensureCollection = async () => {
  * Inserts vector points into the database.
  */
 export const insertVectors = async (points) => {
+  if (!qdrantAvailable) {
+    logger.warn('Qdrant unavailable - skipping vector insertion');
+    return { success: true, skipped: true };
+  }
   try {
     await ensureCollection();
+    if (!qdrantAvailable) {
+      return { success: true, skipped: true };
+    }
     return await client.upsert(COLLECTION_NAME, {
       wait: true,
       points,
     });
   } catch (error) {
-    console.error('Vector DB Insert Error:', error.message);
-    throw error;
+    qdrantAvailable = false;
+    logger.error('Vector DB Insert Error', { error: error.message });
+    return { success: true, skipped: true };
   }
 };
 
@@ -66,12 +79,15 @@ export const insertVectors = async (points) => {
  * Searches for the most similar vectors.
  */
 export const searchVectors = async (vector, documentIds) => {
+  if (!qdrantAvailable) {
+    return [];
+  }
   try {
     const searchParams = {
-      vector,
-      limit: config.rag.topK || 4,
-      with_payload: true,
-    };
+        vector,
+        limit: 50,
+        with_payload: true,
+      };
 
     if (documentIds && documentIds.length > 0) {
       const cleanIds = Array.isArray(documentIds) 
@@ -87,6 +103,7 @@ export const searchVectors = async (vector, documentIds) => {
     }
 
     await ensureCollection();
+    if (!qdrantAvailable) return [];
     const results = await client.search(COLLECTION_NAME, searchParams);
 
     return results.map(item => ({
@@ -97,7 +114,7 @@ export const searchVectors = async (vector, documentIds) => {
     }));
   } catch (error) {
     console.error('Vector DB Search Error:', error.message);
-    throw error;
+    return [];
   }
 };
 
@@ -105,9 +122,11 @@ export const searchVectors = async (vector, documentIds) => {
  * Retrieves ALL chunks for a document.
  */
 export const getAllDocumentContext = async (documentId) => {
+  if (!qdrantAvailable) return '';
   try {
     const docIdStr = documentId.toString();
     await ensureCollection();
+    if (!qdrantAvailable) return '';
     const results = await client.scroll(COLLECTION_NAME, {
       filter: {
         must: [{ key: 'docId', match: { value: docIdStr } }],
@@ -132,9 +151,11 @@ export const getAllDocumentContext = async (documentId) => {
  * Deletes vectors belonging to a specific document.
  */
 export const deleteVectorsByDocId = async (documentId) => {
+  if (!qdrantAvailable) return { success: true };
   try {
     const docIdStr = documentId.toString();
     await ensureCollection();
+    if (!qdrantAvailable) return { success: true };
     return await client.delete(COLLECTION_NAME, {
       filter: {
         must: [{ key: 'docId', match: { value: docIdStr } }],

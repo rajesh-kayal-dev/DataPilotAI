@@ -233,10 +233,22 @@ const Message: React.FC<MessageProps> = ({
                           {children}
                         </code>
                       );
+                    },
+                    table({ children }) {
+                      return <div className="overflow-x-auto my-3"><table className="min-w-full border-collapse">{children}</table></div>;
+                    },
+                    th({ children }) {
+                      return <th className="border border-white/20 bg-white/10 px-3 py-2 text-left text-sm font-semibold text-white">{children}</th>;
+                    },
+                    td({ children }) {
+                      return <td className="border border-white/10 px-3 py-2 text-sm text-white/80 align-top">{children}</td>;
+                    },
+                    tr({ children }) {
+                      return <tr className="even:bg-white/5">{children}</tr>;
                     }
                   }}
                 >
-                  {displayedText}
+                  {displayedText.replace(/<br\s*\/?>/gi, '\n')}
                 </ReactMarkdown>
               </div>
             )}

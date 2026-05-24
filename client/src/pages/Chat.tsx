@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import MainLayout from '../layouts/MainLayout';
 import Message from '../components/Message';
 import ChatInput from '../components/ChatInput';
@@ -8,7 +9,7 @@ import axiosInstance from '../utils/axiosInstance';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { toast } from 'react-hot-toast';
 
-import type { ChatMessage, ChatResponse } from '../types';
+import type { ChatMessage, ChatResponse, Model } from '../types';
 
 const Chat: React.FC = () => {
   const { workspaceId, chatId } = useParams<{ workspaceId: string; chatId?: string }>();
@@ -24,6 +25,8 @@ const Chat: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [userName, setUserName] = useState<string>('');
+  const [creditError, setCreditError] = useState<{ provider: string; modelLabel?: string } | null>(null);
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isAutoScrollEnabled = useRef(true);
@@ -40,6 +43,20 @@ const Chat: React.FC = () => {
       }
     };
     fetchUser();
+  }, []);
+
+  // Fetch available models for credit exhaustion fallback suggestion
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const { data } = await axiosInstance.get('/models');
+        const all = [...(data.free || []), ...(data.paid || [])].filter((m: Model) => m.configured !== false);
+        setAvailableModels(all);
+      } catch (err) {
+        console.error('Failed to fetch models', err);
+      }
+    };
+    fetchModels();
   }, []);
 
 
@@ -215,6 +232,22 @@ const Chat: React.FC = () => {
               try {
                 const data = JSON.parse(line.slice(6));
 
+                if (data.error) {
+                  const errorStr = data.error;
+                  if (errorStr.startsWith('CREDIT_EXHAUSTED:')) {
+                    const provider = errorStr.split(':')[1] || 'unknown';
+                    setCreditError({ provider });
+                    // Don't add an error message — the modal explains it
+                  } else {
+                    setMessages(prev => {
+                      const next = [...(Array.isArray(prev) ? prev : [])];
+                      next.push({ role: 'assistant', content: errorStr, animate: true });
+                      return next;
+                    });
+                  }
+                  return;
+                }
+
                 if (data.chunk) {
                   fullAnswer += data.chunk;
                   setMessages(prev => {
@@ -273,10 +306,18 @@ const Chat: React.FC = () => {
       } else {
         console.error('Chat error:', error);
         const errorMessage = error.message || 'Something went wrong. Please try again.';
-        setMessages((prev) => [
-          ...(Array.isArray(prev) ? prev : []),
-          { role: 'assistant', content: errorMessage, animate: true },
-        ]);
+        // Detect credit exhaustion from HTTP error response
+        if (errorMessage.includes('CREDIT_EXHAUSTED')) {
+          const provider = errorMessage.includes('freemodel') ? 'freemodel' :
+                           errorMessage.includes('gemini') ? 'gemini' :
+                           errorMessage.includes('openrouter') ? 'openrouter' : 'provider';
+          setCreditError({ provider });
+        } else {
+          setMessages((prev) => [
+            ...(Array.isArray(prev) ? prev : []),
+            { role: 'assistant', content: errorMessage, animate: true },
+          ]);
+        }
       }
     } finally {
       setIsLoading(false);
@@ -329,8 +370,8 @@ const Chat: React.FC = () => {
       toast.success('Document uploaded and processing started', { id: toastId });
       refreshDocuments();
     } catch (err) {
-      console.error('Failed to upload', err);
-      toast.error('Failed to upload document', { id: toastId });
+      const message = (err as Error).message || 'Failed to upload document';
+      toast.error(message, { id: toastId });
     }
   };
 
@@ -470,6 +511,49 @@ const Chat: React.FC = () => {
         )}
 
       </div>
+
+      {/* Credit Exhausted Modal */}
+      {creditError && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60" onClick={() => setCreditError(null)}>
+          <div className="bg-[#1A1A24] border border-white/10 rounded-3xl p-8 max-w-md w-[90%] mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-5">
+              <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <h3 className="text-xl font-bold text-white text-center mb-2">Model Credits Exhausted</h3>
+            <p className="text-white/50 text-center mb-6">
+              The <span className="text-white/80 font-medium">{creditError.provider === 'freemodel' ? 'Claude' : creditError.provider === 'gemini' ? 'Gemini' : 'selected'}</span> model provider's API credits have been exhausted. Please try a different model or contact support.
+            </p>
+            <div className="flex flex-col gap-3">
+              {availableModels.filter(m => m.type === 'free').slice(0, 1).map(freeModel => (
+                <button
+                  key={freeModel.id}
+                  onClick={async () => {
+                    try {
+                      await axiosInstance.patch('/models/user', { modelId: freeModel.id });
+                      toast.success(`Switched to ${freeModel.label}`);
+                      setCreditError(null);
+                      // Reload to apply new model
+                      window.location.reload();
+                    } catch (e) {
+                      toast.error('Failed to switch model');
+                    }
+                  }}
+                  className="w-full py-3 rounded-2xl bg-brand hover:bg-brand/90 text-white text-sm font-bold shadow-lg shadow-brand/20 transition-all"
+                >
+                  Switch to {freeModel.label} (Free)
+                </button>
+              ))}
+              <button
+                onClick={() => setCreditError(null)}
+                className="w-full py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white/60 text-sm font-bold border border-white/10 transition-all"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </MainLayout>
   );
 };

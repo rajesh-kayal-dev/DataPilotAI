@@ -161,6 +161,18 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     }
   };
 
+  const handleReembedDoc = async (id: string) => {
+    const toastId = toast.loading('Re-embedding document...');
+    try {
+      await axiosInstance.post(`/documents/${id}/reembed?workspaceId=${activeWorkspaceId}`);
+      toast.success('Re-embedding started', { id: toastId });
+      refreshDocuments();
+    } catch (err) {
+      const message = (err as Error).message || 'Failed to re-embed';
+      toast.error(message, { id: toastId });
+    }
+  };
+
   return (
     <aside className={`h-full shrink-0 flex flex-col glass-panel z-30 relative transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${collapsed ? 'w-[80px]' : 'w-64'}`}>
       
@@ -317,7 +329,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                         )}
                       </div>
                       {!collapsed && !isProcessing && (
-                        <button onClick={() => handleDeleteDoc(doc._id)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        <div className="flex items-center gap-0.5">
+                          <button onClick={() => handleReembedDoc(doc._id)} title="Re-embed" className="opacity-0 group-hover:opacity-100 p-1 hover:text-brand transition-opacity"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg></button>
+                          <button onClick={() => handleDeleteDoc(doc._id)} title="Delete" className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -339,8 +354,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                       toast.success('Your PDF has been uploaded successfully!', { id: toastId });
                       refreshDocuments();
                     } catch (err) {
-                      console.error('Failed to upload', err);
-                      toast.error('Failed to upload document', { id: toastId });
+                      const message = (err as Error).message || 'Failed to upload document';
+                      toast.error(message, { id: toastId });
                     }
                     e.target.value = '';
                   }}/>

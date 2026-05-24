@@ -48,6 +48,10 @@ export const handleChat = async (req, res) => {
       // 3. Final cleanup and persistence
       let chatSession;
       if (!fullAnswer && result.answer) fullAnswer = result.answer;
+      // Fallback if everything is empty — prevent saving blank messages
+      if (!fullAnswer || fullAnswer.trim().length === 0) {
+        fullAnswer = "I could not generate a response. Please try asking again.";
+      }
       
       if (regenerate && chatId) {
         chatSession = await updateLastResponse(chatId, userId, fullAnswer, workspaceId, result);

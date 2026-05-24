@@ -14,6 +14,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'top',
     badge: 'Recommended',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'mimo-flash',
@@ -23,6 +26,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'top',
     badge: 'Popular',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'gemma-4b',
@@ -32,6 +38,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'top',
     badge: 'Free',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'deepseek-r1-free',
@@ -41,6 +50,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'top',
     badge: 'Reasoning',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'llama-3-8b',
@@ -50,6 +62,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'fast',
     badge: 'Fast',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'devstral',
@@ -59,6 +74,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'top',
     badge: 'Free',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'qwen3',
@@ -68,6 +86,9 @@ export const MODEL_REGISTRY = [
     type: 'free',
     tier: 'specialized',
     badge: 'Coding',
+    apiProvider: 'openrouter',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
   },
 
   // =========================
@@ -82,6 +103,9 @@ export const MODEL_REGISTRY = [
     type: 'paid',
     tier: 'premium',
     badge: 'Flagship',
+    apiProvider: 'openrouter',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'gpt-4o-mini',
@@ -91,6 +115,9 @@ export const MODEL_REGISTRY = [
     type: 'paid',
     tier: 'budget',
     badge: 'Fast',
+    apiProvider: 'openrouter',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'claude-opus',
@@ -100,6 +127,9 @@ export const MODEL_REGISTRY = [
     type: 'paid',
     tier: 'premium',
     badge: 'Powerful',
+    apiProvider: 'openrouter',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'claude-sonnet',
@@ -109,6 +139,9 @@ export const MODEL_REGISTRY = [
     type: 'paid',
     tier: 'balanced',
     badge: 'Best',
+    apiProvider: 'openrouter',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'deepseek-chat',
@@ -118,6 +151,9 @@ export const MODEL_REGISTRY = [
     type: 'paid',
     tier: 'balanced',
     badge: 'Best',
+    apiProvider: 'openrouter',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
   },
   {
     id: 'gemini-flash',
@@ -127,6 +163,79 @@ export const MODEL_REGISTRY = [
     type: 'paid',
     tier: 'fast',
     badge: 'Fast',
+    apiProvider: 'openrouter',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
+  },
+
+  // =========================
+  // GEMINI via DIRECT GOOGLE API (PAID)
+  // =========================
+
+  {
+    id: 'gemini-flash-v2',
+    label: 'Gemini Flash',
+    provider: 'Google Direct',
+    model: 'gemini-2.5-flash',
+    type: 'paid',
+    tier: 'fast',
+    badge: 'Fast',
+    apiProvider: 'gemini',
+    configured: true,
+    fallbackId: 'gemini-flash-v2',
+  },
+  {
+    id: 'gemini-pro-v2',
+    label: 'Gemini Pro',
+    provider: 'Google Direct',
+    model: 'gemini-2.5-pro',
+    type: 'paid',
+    tier: 'premium',
+    badge: 'Google',
+    apiProvider: 'gemini',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
+  },
+
+  // =========================
+  // CLAUDE CODE via FREEMODEL (PROXY)
+  // =========================
+
+  {
+    id: 'freemodel-claude-sonnet',
+    label: 'Claude Sonnet (Code)',
+    provider: 'Freemodel Proxy',
+    model: 'claude-sonnet-4-6',
+    type: 'paid',
+    tier: 'premium',
+    badge: 'Claude Code',
+    apiProvider: 'freemodel',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
+  },
+  {
+    id: 'freemodel-claude-haiku',
+    label: 'Claude Haiku (Code)',
+    provider: 'Freemodel Proxy',
+    model: 'claude-haiku-4-5-20251001',
+    type: 'paid',
+    tier: 'fast',
+    badge: 'Claude Code',
+    apiProvider: 'freemodel',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
+  },
+  {
+    id: 'freemodel-claude-opus',
+    label: 'Claude Opus (Code)',
+    provider: 'Freemodel Proxy',
+    model: 'claude-opus-4-6',
+    type: 'paid',
+    tier: 'premium',
+    badge: 'Claude Code',
+    apiProvider: 'freemodel',
+    configured: false,
+    fallbackId: 'gpt-oss-120b',
   }
 
 ];
@@ -169,10 +278,68 @@ export const getModelInfo = (modelId) => {
 };
 
 // =========================
-// GROUP FOR DROPDOWN
+// GET API PROVIDER
 // =========================
 
-export const getGroupedModels = () => ({
-  free: MODEL_REGISTRY.filter(m => m.type === 'free'),
-  paid: MODEL_REGISTRY.filter(m => m.type === 'paid'),
-});
+export const getModelApiProvider = (modelId) => {
+  const entry = MODEL_REGISTRY.find(m => m.id === modelId);
+  return entry?.apiProvider || 'openrouter';
+};
+
+// =========================
+// CHECK IF PROVIDER IS CONFIGURED
+// =========================
+
+const isProviderConfigured = (apiProvider) => {
+  try {
+    if (apiProvider === 'freemodel') {
+      return !!(process.env.FREEMODEL_API_KEY);
+    }
+    if (apiProvider === 'openrouter') {
+      return !!(process.env.OPENROUTER_API_KEY);
+    }
+    if (apiProvider === 'gemini') {
+      return !!(process.env.GEMINI_API_KEY);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// =========================
+// GROUP FOR DROPDOWN (with configured flag)
+// =========================
+
+export const getGroupedModels = () => {
+  const enrich = (m) => {
+    const providerConfigured = isProviderConfigured(m.apiProvider || 'openrouter');
+    const isConfigured = m.configured !== false && providerConfigured;
+    return {
+      ...m,
+      configured: isConfigured,
+    };
+  };
+
+  return {
+    free: MODEL_REGISTRY.filter(m => m.type === 'free').map(enrich),
+    paid: MODEL_REGISTRY.filter(m => m.type === 'paid').map(enrich),
+  };
+};
+
+// =========================
+// GET FALLBACK MODEL
+// =========================
+
+export const getFallbackForModel = (modelId) => {
+  const entry = MODEL_REGISTRY.find(m => m.id === modelId);
+  if (entry?.fallbackId) {
+    const fallback = getGroupedModels();
+    const allModels = [...fallback.free, ...fallback.paid];
+    const fb = allModels.find(m => m.id === entry.fallbackId);
+    if (fb && fb.configured) return fb;
+  }
+  const fb = getGroupedModels();
+  const firstConfiguredPaid = fb.paid.find(m => m.configured);
+  return firstConfiguredPaid || null;
+};

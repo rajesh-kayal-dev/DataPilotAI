@@ -119,6 +119,33 @@ export const handleCancelUpload = async (req, res) => {
   }
 };
 
+export const handleReembed = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { workspaceId } = req.query;
+
+    const filter = { _id: req.params.id, userId };
+    if (workspaceId && workspaceId !== 'all') {
+      filter.workspaceId = workspaceId;
+    }
+
+    const document = await Document.findOne(filter);
+    if (!document) return res.status(404).json({ error: 'Document not found in this workspace' });
+
+    // Don't await — process in background to prevent HTTP timeout on OCR-heavy docs
+    const { reembedDocument } = await import('../services/documentService.js');
+    reembedDocument(req.params.id).catch(err => {
+      logger.error('Background re-embed failed', { documentId: req.params.id, error: err.message });
+    });
+
+    logger.info('Document re-embedding dispatched', { documentId: req.params.id, userId });
+    res.json({ success: true, message: 'Document re-embedding started' });
+  } catch (error) {
+    logger.error('Reembed Error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Re-embedding failed' });
+  }
+};
+
 export const chatWithDocument = async (req, res) => {
   try {
     const { question, documentId: bodyDocumentId, workspaceId } = req.body;

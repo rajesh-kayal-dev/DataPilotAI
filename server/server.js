@@ -6,9 +6,8 @@ import connectDB from './src/config/db.js';
 import { connectRedis } from './src/config/redis.js';
 import { ensureCollection } from './src/services/vectorService.js';
 import { checkS3Connection } from './src/services/s3Service.js';
-import './src/workers/documentWorker.js'; // Start background worker
-
 import { logger } from './src/utils/logger.js';
+import './src/workers/documentWorker.js'; // Start background worker
 
 const PORT = process.env.PORT || 5000;
 

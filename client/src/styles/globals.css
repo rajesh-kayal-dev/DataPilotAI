@@ -837,6 +837,30 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0;
   color: #E2D9F3;
 }
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+.markdown-content th {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.875rem;
+}
+.markdown-content td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  vertical-align: top;
+}
+.markdown-content tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.04);
+}
 
 /* --- TTS Speaking Animation --- */
 @keyframes bird-speaking {
