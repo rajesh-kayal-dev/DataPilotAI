@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { config } from '../config/env.js';
 import { buildRAGPrompt, buildStrictRAGPrompt, buildGeneralPrompt } from '../utils/promptBuilder.js';
+import { buildSummaryPrompt } from '../utils/summaryPromptBuilder.js';
+import { buildCitationPrompt } from '../utils/citationPromptBuilder.js';
 import { logger } from '../utils/logger.js';
 import { llmCircuitBreaker } from '../utils/circuitBreaker.js';
 
@@ -37,13 +39,16 @@ const buildChatMessages = (question, context, options = {}) => {
     regenerate = false,
     userName = 'a user',
     userEmail = '',
+    isSummarizer = false,
+    isCitation = false,
+    citationSources = [],
   } = options;
 
   const chatMessages = [];
 
   chatMessages.push({
     role: 'system',
-    content: `You are DataPilot AI, a professional intelligence assistant. You are chatting with a user. Only use their name if the user directly asks about themselves (their profile is: Name: ${userName}, Email: ${userEmail || 'Not provided'}). Otherwise, never address them by name.${regenerate ? '\n\nIMPORTANT: The user wants an improved and DIFFERENT version of the previous answer. Provide a fresh perspective, refine the depth, and use a slightly different structure to ensure high value.' : ''}`
+    content: `You are DataPilot AI, a smart and friendly assistant. Keep responses conversational, concise, and easy to read. Write like a knowledgeable friend — not a textbook. Short paragraphs, direct answers, no fluff. Only use their name if the user directly asks about themselves (their profile is: Name: ${userName}, Email: ${userEmail || 'Not provided'}).${regenerate ? '\n\nThe user wants a DIFFERENT and improved version of the previous answer. Change the structure and approach.' : ''}`
   });
 
   const historyExchanges = history.map(msg => ({
@@ -57,7 +62,11 @@ const buildChatMessages = (question, context, options = {}) => {
   const hasSufficientContext = contextLength > 50;
 
   let prompt;
-  if (mode === 'strict') {
+  if (isCitation && hasSufficientContext) {
+    prompt = buildCitationPrompt(context, question, citationSources, isGreeting);
+  } else if (isSummarizer && hasSufficientContext) {
+    prompt = buildSummaryPrompt(context, question, isGreeting);
+  } else if (mode === 'strict') {
     prompt = buildStrictRAGPrompt(context, question, isDocFound, hasDocuments, isGreeting);
   } else {
     if (isGreeting) {
@@ -130,6 +139,61 @@ const callOpenRouter = async (chatMessages, selectedModel, isFallback, options) 
   return { success: true, answer, model: selectedModel };
   } catch (error) {
     if (isCreditError(error)) throw new CreditError('openrouter');
+    throw error;
+  }
+};
+
+const callGroq = async (chatMessages, selectedModel, isFallback, options) => {
+  const { onStream } = options;
+
+  try {
+    const response = await axios.post(
+      `${config.groq.baseUrl}/chat/completions`,
+      {
+        model: selectedModel,
+        messages: chatMessages,
+        max_tokens: isFallback ? 150 : config.llm.maxTokens,
+        temperature: options.regenerate ? 0.8 : config.llm.temperature,
+        top_p: config.llm.topP,
+        stream: !!onStream,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${config.groq.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: config.llm.timeout,
+        responseType: onStream ? 'stream' : 'json',
+      }
+    );
+
+    if (onStream) {
+      return new Promise((resolve, reject) => {
+        let fullText = '';
+        response.data.on('data', (chunk) => {
+          const lines = chunk.toString().split('\n').filter(l => l.trim() !== '');
+          for (const line of lines) {
+            if (line.includes('[DONE]')) break;
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const content = data.choices[0]?.delta?.content || '';
+                fullText += content;
+                onStream(content);
+              } catch (e) {}
+            }
+          }
+        });
+        response.data.on('end', () => resolve({ success: true, answer: fullText, model: selectedModel }));
+        response.data.on('error', reject);
+      });
+    }
+
+    const answer = response.data?.choices?.[0]?.message?.content?.trim();
+    if (!answer) throw new Error('EMPTY_RESPONSE');
+    return { success: true, answer, model: selectedModel };
+  } catch (error) {
+    if (isCreditError(error)) throw new CreditError('groq');
     throw error;
   }
 };
@@ -316,6 +380,9 @@ export const generateAnswer = async (question, context, model, options = {}) => 
   const apiAction = async () => {
     const chatMessages = buildChatMessages(question, context, options);
 
+    if (apiProvider === 'groq') {
+      return await callGroq(chatMessages, selectedModel, isFallback, options);
+    }
     if (apiProvider === 'freemodel') {
       return await callFreemodel(chatMessages, selectedModel, isFallback, options);
     }

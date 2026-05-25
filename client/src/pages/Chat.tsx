@@ -10,6 +10,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { toast } from 'react-hot-toast';
 
 import type { ChatMessage, ChatResponse, Model } from '../types';
+import { type AgentType } from '../components/AgentMenu';
 
 const Chat: React.FC = () => {
   const { workspaceId, chatId } = useParams<{ workspaceId: string; chatId?: string }>();
@@ -23,6 +24,8 @@ const Chat: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatTitle, setChatTitle] = useState<string>('New Chat');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<AgentType>('chat');
+  const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [userName, setUserName] = useState<string>('');
   const [creditError, setCreditError] = useState<{ provider: string; modelLabel?: string } | null>(null);
@@ -167,6 +170,7 @@ const Chat: React.FC = () => {
     }
 
     setIsLoading(true);
+    setStreamStatus(null);
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -191,7 +195,9 @@ const Chat: React.FC = () => {
           chatId: chatId || undefined,
           stream: true,
           regenerate: isRegenerate,
-          mode: ragMode
+          mode: ragMode,
+          selectedAgent,
+          webSearch: selectedAgent === 'research',
         })
       });
 
@@ -248,7 +254,12 @@ const Chat: React.FC = () => {
                   return;
                 }
 
+                if (data.status) {
+                  setStreamStatus(data.status);
+                }
+
                 if (data.chunk) {
+                  setStreamStatus(null);
                   fullAnswer += data.chunk;
                   setMessages(prev => {
                     const next = [...prev];
@@ -264,6 +275,7 @@ const Chat: React.FC = () => {
                 }
 
                 if (data.done) {
+                  setStreamStatus(null);
                   streamMetadata = data;
                 }
               } catch (e) { }
@@ -284,7 +296,8 @@ const Chat: React.FC = () => {
                   ...next[i],
                   source: streamMetadata.source,
                   modelName: streamMetadata.model,
-                  confidence: streamMetadata.confidence
+                  confidence: streamMetadata.confidence,
+                  webResults: streamMetadata.webResults || next[i].webResults,
                 };
                 break;
               }
@@ -428,7 +441,13 @@ const Chat: React.FC = () => {
 
                 {/* 2. Centered Input Box */}
                 <div className="w-full">
-                  <ChatInput onSend={handleSend} onUpload={handleUpload} isLoading={isLoading} />
+                  <ChatInput 
+                    onSend={handleSend} 
+                    onUpload={handleUpload} 
+                    isLoading={isLoading}
+                    selectedAgent={selectedAgent}
+                    onSelectAgent={setSelectedAgent}
+                  />
                 </div>
 
                 {/* 3. Compact Suggestions */}
@@ -466,6 +485,7 @@ const Chat: React.FC = () => {
                       onStop={handleStop}
                       onDelete={handleDeleteMessage}
                       id={msg._id}
+                      webResults={msg.webResults}
                     />
                   </div>
 
@@ -478,6 +498,17 @@ const Chat: React.FC = () => {
                   )}
                 </div>
               ))}
+              {streamStatus && (
+                <div className="flex items-center gap-2.5 px-1 py-3">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span className="text-[11px] font-medium text-white/40 animate-pulse">{streamStatus}</span>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -501,8 +532,15 @@ const Chat: React.FC = () => {
               )}
 
               <div className={isLoading ? 'opacity-70 pointer-events-none' : ''}>
-                <ChatInput onSend={handleSend} onUpload={handleUpload} isLoading={isLoading} />
+                <ChatInput 
+                  onSend={handleSend} 
+                  onUpload={handleUpload} 
+                  isLoading={isLoading}
+                  selectedAgent={selectedAgent}
+                  onSelectAgent={setSelectedAgent}
+                />
               </div>
+              
               <p className="text-[10px] text-center text-white/20 mt-3 font-medium">
                 DataPilotAI can make mistakes. Verify important information.
               </p>

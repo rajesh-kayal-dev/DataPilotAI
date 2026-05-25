@@ -72,5 +72,14 @@ export const config = {
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
     baseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com'
+  },
+
+  groq: {
+    apiKey: process.env.GROQ_API_KEY,
+    baseUrl: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
+  },
+
+  tavily: {
+    apiKey: process.env.TAVILY_API_KEY,
   }
 };

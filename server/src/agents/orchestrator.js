@@ -1,5 +1,8 @@
 import { retrieveContext } from './researchAgent.js';
+import { retrieveWebContext } from './researchWebAgent.js';
 import { generateAnswer } from './chatAgent.js';
+import { generateSummary } from './summarizerAgent.js';
+import { generateCitationAnswer } from './citationAgent.js';
 import { config } from '../config/env.js';
 import { detectIntent } from '../utils/intentDetector.js';
 import { checkRateLimit } from '../utils/rateLimiter.js';
@@ -15,7 +18,10 @@ import User from '../models/User.js';
  */
 export const processChatFlow = async (question, documentIds, userId, options = {}) => {
   const startTime = Date.now();
-  const { onStream, workspaceId, history = [] } = options;
+  const { onStream, onStatus, workspaceId, history = [], selectedAgent = 'chat', webSearch = false } = options;
+  const isResearchAgent = selectedAgent === 'research' || webSearch === true;
+  const isSummarizerAgent = selectedAgent === 'summarizer';
+  const isCitationAgent = selectedAgent === 'citation';
 
   // Ensure documentIds is an array
   const docIdsArray = Array.isArray(documentIds) ? documentIds : (documentIds ? [documentIds] : []);
@@ -24,6 +30,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
   try {
     // 1. Resolve Mode early for logging and logic
     const mode = options.mode || config.rag.mode || 'hybrid';
+    const effectiveMode = isResearchAgent ? 'hybrid' : mode;
 
     // 2. Rate Limiting & Daily Quota
     const rateLimit = await checkRateLimit(userId);
@@ -38,11 +45,11 @@ export const processChatFlow = async (question, documentIds, userId, options = {
 
     // 4. Intent Detection & Logging
     const intent = detectIntent(question);
-    const isSummaryQuery = /summarize|summary|overview|key points|explain document/i.test(question);
+    const isSummaryQuery = /summarize|summary|overview|key points|explain document/i.test(question) || isSummarizerAgent;
     
     // 4.5 Document-Check Guardrail (Requested Feature)
     // If user asks for summary/doc analysis but has NOT uploaded any documents
-    const isDocRelatedQuery = intent === 'doc_summary' || isSummaryQuery;
+    const isDocRelatedQuery = intent === 'doc_summary' || isSummaryQuery || isCitationAgent;
     if (isDocRelatedQuery && !hasDocuments) {
       const guardrailMsg = "Sorry, but you are not providing any document. Please upload a document.";
       logger.info('Guardrail triggered: Doc query without documents', { userId });
@@ -82,11 +89,14 @@ export const processChatFlow = async (question, documentIds, userId, options = {
 
     let docNames = '';
     let hasMatchedChunks = false;
+    let citationSources = [];
 
     let workspaceDocs = [];
     if (hasDocuments) {
-      // For summary queries, we tell the research agent to be more aggressive
-      const retrievalResult = await retrieveContext(question, docIdsArray, isSummaryQuery || intent === 'doc_summary');
+      if (isSummarizerAgent && onStatus) onStatus('Reading document...');
+      if (isCitationAgent && onStatus) onStatus('Verifying sources...');
+      const includeChunkMeta = isCitationAgent;
+      const retrievalResult = await retrieveContext(question, docIdsArray, isSummaryQuery || intent === 'doc_summary', includeChunkMeta);
       context = retrievalResult.context;
       confidence = retrievalResult.confidence;
       alignment = retrievalResult.alignment;
@@ -94,6 +104,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       chunks = retrievalResult.chunks;
       docNames = retrievalResult.docNames;
       hasMatchedChunks = retrievalResult.hasMatchedChunks;
+      citationSources = retrievalResult.chunkMeta || [];
 
 
 
@@ -106,8 +117,36 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       }
     }
 
+    // 4.5 Web Search (for research agent mode)
+    let webResults = [];
+    let webContext = '';
+    let hasWebResults = false;
+
+    if (isResearchAgent) {
+      if (onStatus) onStatus('Searching web and retrieving sources...');
+      const webResult = await retrieveWebContext(question, { maxResults: 5 });
+      if (webResult.hasWebResults) {
+        if (onStatus) onStatus('Analyzing search results...');
+        webContext = webResult.context;
+        webResults = webResult.webResults || [];
+        hasWebResults = true;
+        // Merge web context AFTER document context (priority: document → web)
+        if (context && webContext) {
+          if (onStatus) onStatus('Combining web results with document context...');
+          context = context + '\n\n=== WEB SEARCH RESULTS ===\n\n' + webContext;
+        } else if (webContext) {
+          context = webContext;
+        }
+        // Boost confidence if web results are reliable
+        if (webResult.isReliable && !isReliable) {
+          confidence = webResult.confidence;
+          isReliable = true;
+        }
+      }
+    }
+
     // 5. RAG Mode Logic (Strict vs Hybrid)
-    const isStrict = mode === 'strict';
+    const isStrict = effectiveMode === 'strict';
     const isDocQuery = intent === 'doc_question' || intent === 'doc_summary' || isSummaryQuery;
 
     // In Strict Mode, we block the LLM if context is unreliable for doc queries
@@ -160,8 +199,20 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     }
 
     // 7. Generation
-    const result = await generateAnswer(question, context, modelId, { 
-      onStream, 
+    if (isSummarizerAgent && onStatus) onStatus('Creating summary...');
+    if (isCitationAgent && onStatus) onStatus('Checking document context...');
+
+    let generateFn;
+    if (isCitationAgent) {
+      generateFn = (q, ctx, mId, opts) => generateCitationAnswer(q, ctx, mId, { ...opts, citationSources });
+    } else if (isSummarizerAgent) {
+      generateFn = generateSummary;
+    } else {
+      generateFn = generateAnswer;
+    }
+
+    const result = await generateFn(question, context, modelId, {
+      onStream,
       userId,
       userName,
       userEmail,
@@ -170,7 +221,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       hasDocuments,
       isGreeting: intent === 'greeting',
       history,
-      mode: mode, // Pass the resolved mode down
+      mode: effectiveMode,
       regenerate: options.regenerate
     });
 
@@ -195,7 +246,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
         answer = "I'm not sure about that. Could you please provide more details or upload a document so I can help better?";
       }
     }
-    const isHybridGeneral = result.success && hasDocuments && !isReliable && intent !== 'greeting';
+    const isHybridGeneral = result.success && hasDocuments && !isReliable && intent !== 'greeting' && !isSummarizerAgent && !isCitationAgent;
     
     if (isHybridGeneral) {
       answer = `Sorry, but I am not finding anything related in your provided document.\n\n${answer}`;
@@ -220,6 +271,20 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       if (match) docByContentMatch = match.name;
     }
 
+    const combinedSource = docByKeyword || docByContentMatch || ((isReliable || hasMatchedChunks) ? (docNames || 'Document') : '');
+    let source = combinedSource;
+    if (isSummarizerAgent) {
+      source = source ? `Summary of ${source}` : 'Document Summary';
+    } else if (isCitationAgent) {
+      source = source ? `Sources: ${source}` : 'Document Sources';
+    } else if (!source && hasWebResults) {
+      source = 'Web Search';
+    } else if (!source) {
+      source = 'General Knowledge';
+    } else if (hasWebResults) {
+      source = source + ' + Web';
+    }
+
     const responseTime = Date.now() - startTime;
     const finalPayload = {
       success: result.success,
@@ -227,14 +292,16 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       model: result.model,
       confidence,
       alignment,
-      source: docByKeyword || docByContentMatch || ((isReliable || hasMatchedChunks) ? (docNames || 'Document') : 'General Knowledge'),
+      source,
       responseTime,
       cached: false,
-      chunks: chunks.slice(0, 3)
+      chunks: chunks.slice(0, 3),
+      webResults: hasWebResults ? webResults.map(r => ({
+        title: r.title,
+        url: r.url,
+        content: r.content && r.content.length > 200 ? r.content.substring(0, 200) + '...' : r.content,
+      })) : undefined,
     };
-
-    // Ensure source is never empty for the UI
-    if (!finalPayload.source) finalPayload.source = 'General Knowledge';
 
     // 9. Post-Processing
     if (result.success) {

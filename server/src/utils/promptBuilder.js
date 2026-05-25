@@ -5,26 +5,15 @@
 
 const SHARED_FORMATTING_RULES = `
 FORMATTING RULES (MANDATORY):
-1. **Structure**: Always organize your response with these headings:
-   ## Overview
-   (A short 2-3 line executive summary)
-
-   ## Key Points
-   (Use clear bullet points for the main ideas)
-
-   ## Details
-   (Use bullet points and short 2-3 line paragraphs for deeper explanation)
-
-   ## Example (If relevant)
-   (Provide clean code blocks or practical examples)
-
-2. **Scannability**: Use short bullet points instead of long sentences. 
-3. **Spacing**: Add a double line break after every section/heading.
-4. **No Clutter**: Do NOT use separators like "---" or "***". Use clean markdown headers instead.
-5. **No HTML**: Never use HTML tags (&lt;br&gt;, &lt;b&gt;, etc.). Use pure markdown only.
-6. **No Tables**: CRITICAL — Never use markdown tables. Do not use pipe characters for table formatting. Tables render as broken unreadable text.
-7. **Formatting allowed**: Only use **bold**, *italic*, inline code, ## headings, and - bullet points. That is all.
-8. **Conciseness**: Focus on the most useful information. Avoid massive blocks of text.
+1. **Conversational first**: Write like a smart friend explaining something — not a textbook.
+2. **Short paragraphs**: 2-3 sentences max per paragraph. Never write walls of text.
+3. **Clean structure**: Use short sections with ## headings. Keep them brief.
+4. **Smart bullets**: Bullet points OK but keep them 1 line each. No nested bullets.
+5. **No tables**: Never use markdown tables. No pipe characters.
+6. **No HTML**: Never use HTML tags. Pure markdown only.
+7. **No clutter**: No separators (---, ***). No inline citations [1]. No disclaimers.
+8. **Allowed formatting**: **bold**, *italic*, inline code, ## headings, - bullet points only.
+9. **Be direct**: Answer first, explain second. Lead with the most important thing.
 `;
 
 const GREETING_FORMATTING_RULES = `

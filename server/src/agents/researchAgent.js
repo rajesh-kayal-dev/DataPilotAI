@@ -8,7 +8,7 @@ import Document from '../models/Document.js';
  * Research Agent (Production V5)
  * - Intelligent source attribution: Returns only the names of documents that actually matched the query.
  */
-export const retrieveContext = async (question, documentIds, isSummary = false) => {
+export const retrieveContext = async (question, documentIds, isSummary = false, includeChunkMeta = false) => {
   // 0. Fetch Document Metadata
   const docsMetadata = await Document.find({ _id: { $in: documentIds } }).select('name');
   const docNamesMap = docsMetadata.reduce((acc, doc) => {
@@ -42,7 +42,8 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
         alignment: 1,
         isReliable: true,
         docNames: allDocNames,
-        chunks: ['Analyzed full document from memory cache']
+        chunks: ['Analyzed full document from memory cache'],
+        chunkMeta: [],
       };
     } else {
       // For multiple docs, we take a larger sample of chunks (Top 20) to ensure a good summary
@@ -61,6 +62,13 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
         return `[SOURCE: ${sourceName}]\n${item.content.trim()}`;
       }).join('\n\n---\n\n');
 
+      const multiChunkMeta = includeChunkMeta ? summaryChunks.slice(0, 5).map(c => ({
+        docName: docNamesMap[c.docId] || 'Document',
+        score: c.score || 0,
+        chunkIndex: c.chunkIndex ?? 0,
+        content: (c.content || '').trim().substring(0, 200),
+      })) : [];
+
       return {
         context: `[SUMMARY DATA FROM MULTIPLE SOURCES: ${allDocNames}]\n\n${formatted}`,
         confidence: 0.9,
@@ -68,7 +76,8 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
         isReliable: true,
         docNames: allDocNames,
         hasMatchedChunks: summaryChunks.length > 0,
-        chunks: summaryChunks.slice(0, 5).map(c => c.content.substring(0, 100))
+        chunks: summaryChunks.slice(0, 5).map(c => c.content.substring(0, 100)),
+        chunkMeta: multiChunkMeta,
       };
     }
   }
@@ -79,7 +88,7 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
     queryEmbedding = await generateEmbedding(question);
   } catch {
     // Embedding failed — return empty context so orchestrator uses general knowledge fallback
-    return { context: '', confidence: 0, alignment: 0, isReliable: false, docNames: allDocNames, hasMatchedChunks: false, chunks: [] };
+    return { context: '', confidence: 0, alignment: 0, isReliable: false, docNames: allDocNames, hasMatchedChunks: false, chunks: [], chunkMeta: [] };
   }
   const rawResults = await searchVectors(queryEmbedding, documentIds);
 
@@ -156,13 +165,21 @@ export const retrieveContext = async (question, documentIds, isSummary = false) 
     return text.length > 120 ? text.substring(0, 120) + '...' : text;
   });
 
+  const chunkMeta = includeChunkMeta ? finalChunks.slice(0, 5).map(item => ({
+    docName: docNamesMap[item.docId] || 'Unknown Document',
+    score: item.score || 0,
+    chunkIndex: item.chunkIndex ?? 0,
+    content: (item.content || '').trim().substring(0, 200),
+  })) : [];
+
   return {
     context,
     confidence: confidence.score,
     alignment: confidence.alignment,
     isReliable: confidence.isReliable,
-    docNames: matchedDocNames || allDocNames, // Prefer specific matched names
+    docNames: matchedDocNames || allDocNames,
     hasMatchedChunks: finalChunks.length > 0,
-    chunks: snippets
+    chunks: snippets,
+    chunkMeta,
   };
 };

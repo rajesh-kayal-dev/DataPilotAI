@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.js';
  * Handles standard chat flow with ultra-fast Redis memory.
  */
 export const handleChat = async (req, res) => {
-  const { question, workspaceId, chatId, stream = true, regenerate = false, mode = 'hybrid' } = req.body;
+  const { question, workspaceId, chatId, stream = true, regenerate = false, mode = 'hybrid', selectedAgent = 'chat', webSearch = false } = req.body;
   const userId = req.user?.id;
 
   if (!question || !workspaceId) {
@@ -34,9 +34,14 @@ export const handleChat = async (req, res) => {
         history,
         regenerate,
         mode,
+        selectedAgent,
+        webSearch,
         onStream: (chunk) => {
           fullAnswer += chunk;
           res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        },
+        onStatus: (msg) => {
+          res.write(`data: ${JSON.stringify({ status: msg })}\n\n`);
         }
       });
 
@@ -75,7 +80,9 @@ export const handleChat = async (req, res) => {
       const result = await processChatFlow(question, targetDocumentIds, userId, { 
         workspaceId,
         history,
-        mode
+        mode,
+        selectedAgent,
+        webSearch,
       });
       
       if (!result.success) return res.status(500).json(result);

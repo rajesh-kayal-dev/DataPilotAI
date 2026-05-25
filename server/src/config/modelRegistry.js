@@ -92,6 +92,47 @@ export const MODEL_REGISTRY = [
   },
 
   // =========================
+  // GROQ MODELS (FREE — DIRECT API)
+  // =========================
+
+  {
+    id: 'groq-llama-70b',
+    label: 'Llama 3.3 70B',
+    provider: 'Groq',
+    model: 'llama-3.3-70b-versatile',
+    type: 'free',
+    tier: 'top',
+    badge: 'Fast',
+    apiProvider: 'groq',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
+  },
+  {
+    id: 'groq-llama-8b',
+    label: 'Llama 3.1 8B',
+    provider: 'Groq',
+    model: 'llama-3.1-8b-instant',
+    type: 'free',
+    tier: 'fast',
+    badge: 'Instant',
+    apiProvider: 'groq',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
+  },
+  {
+    id: 'groq-qwen-32b',
+    label: 'Qwen3 32B',
+    provider: 'Groq',
+    model: 'qwen/qwen3-32b',
+    type: 'free',
+    tier: 'specialized',
+    badge: 'Reasoning',
+    apiProvider: 'groq',
+    configured: true,
+    fallbackId: 'gpt-oss-120b',
+  },
+
+  // =========================
   // PAID MODELS (PRO USERS)
   // =========================
 
@@ -244,7 +285,7 @@ export const MODEL_REGISTRY = [
 // DEFAULT MODEL
 // =========================
 
-export const DEFAULT_MODEL_ID = 'gpt-oss-120b';
+export const DEFAULT_MODEL_ID = 'groq-llama-70b';
 
 // =========================
 // RESOLVE MODEL (SAFE)
@@ -300,6 +341,9 @@ const isProviderConfigured = (apiProvider) => {
     }
     if (apiProvider === 'gemini') {
       return !!(process.env.GEMINI_API_KEY);
+    }
+    if (apiProvider === 'groq') {
+      return !!(process.env.GROQ_API_KEY);
     }
     return true;
   } catch {

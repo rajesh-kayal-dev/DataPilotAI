@@ -13,6 +13,12 @@ export interface Document {
   workspaceId: string;
 }
 
+export interface WebResult {
+  title: string;
+  url: string;
+  content: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -20,6 +26,7 @@ export interface ChatMessage {
   modelName?: string;
   confidence?: number;
   animate?: boolean;
+  webResults?: WebResult[];
 }
 
 export interface ChatResponse {

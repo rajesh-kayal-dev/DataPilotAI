@@ -2,6 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import AgentThinking from './AgentThinking';
 
+function getDomain(url: string): string {
+  try { return new URL(url).hostname.replace('www.', ''); } catch { return url; }
+}
+
+function getFaviconUrl(url: string): string {
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+  } catch { return ''; }
+}
+
+interface WebResult {
+  title: string;
+  url: string;
+  content: string;
+}
+
 interface MessageProps {
   role: 'user' | 'assistant';
   content: string;
@@ -13,6 +30,7 @@ interface MessageProps {
   onStop?: () => void;
   onDelete?: (id: string) => void;
   id?: string;
+  webResults?: WebResult[];
 }
 
 const CodeBlock: React.FC<{ code: string; language: string }> = ({ code, language }) => {
@@ -104,7 +122,8 @@ const Message: React.FC<MessageProps> = ({
   onRegenerate,
   onStop,
   onDelete,
-  id
+  id,
+  webResults,
 }) => {
   const [isTyping, setIsTyping] = useState(role === 'assistant' && animate);
   const [displayedText, setDisplayedText] = useState('');
@@ -188,6 +207,10 @@ const Message: React.FC<MessageProps> = ({
     navigator.clipboard.writeText(content);
   };
 
+  const [showSources, setShowSources] = useState(false);
+  const hasWebSources = webResults && webResults.length > 0;
+  const isHybrid = hasWebSources && source && source.includes('+ Web');
+
   return (
     <div className={`w-full flex flex-col ${role === 'user' ? 'items-end' : 'items-start'} group mb-2`}>
       {/* Role Label */}
@@ -200,6 +223,16 @@ const Message: React.FC<MessageProps> = ({
         <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">
           {role === 'user' ? 'You' : 'AI Assistant'}
         </span>
+        {isHybrid && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-500/5 border border-green-500/10 text-[9px] font-bold text-green-400/70 tracking-tight">
+            Web + Document
+          </span>
+        )}
+        {hasWebSources && !isHybrid && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-500/5 border border-blue-500/10 text-[9px] font-bold text-blue-400/70 tracking-tight">
+            Web Search
+          </span>
+        )}
       </div>
 
       <div className={`flex items-start w-full ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -301,6 +334,62 @@ const Message: React.FC<MessageProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Sources Panel */}
+              {hasWebSources && !isLoading && (
+                <div className="mt-2.5 pt-2.5 border-t border-white/[0.03]">
+                  <button
+                    onClick={() => setShowSources(v => !v)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-white/30 hover:text-white/50 transition-colors"
+                  >
+                    <svg
+                      className={`w-3 h-3 transition-transform duration-200 ${showSources ? 'rotate-90' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                    </svg>
+                    {showSources ? 'Hide sources' : `View ${webResults.length} source${webResults.length > 1 ? 's' : ''}`}
+                  </button>
+
+                  {showSources && (
+                    <div className="mt-2 space-y-1.5">
+                      {webResults.map((r, i) => (
+                        <a
+                          key={i}
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-start gap-2.5 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all group"
+                        >
+                          {getFaviconUrl(r.url) && (
+                            <img
+                              src={getFaviconUrl(r.url)}
+                              alt=""
+                              className="w-4 h-4 rounded mt-0.5 shrink-0"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-semibold text-white/80 group-hover:text-white truncate">
+                                {r.title || getDomain(r.url)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-[9px] text-white/30 truncate">{getDomain(r.url)}</span>
+                            </div>
+                            {r.content && (
+                              <p className="text-[10px] text-white/40 leading-relaxed mt-0.5 line-clamp-2">
+                                {r.content.replace(/<[^>]+>/g, '').substring(0, 200)}
+                              </p>
+                            )}
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Trace toggle — mounts fresh each generation, always starts closed */}
               {isLoading && isLast && <TraceToggle />}
