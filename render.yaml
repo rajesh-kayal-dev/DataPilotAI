@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: datapilotai-backend
+    runtime: node
+    repo: https://github.com/rajeshkayal8001/DataPilotAI
+    branch: main
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "5000"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: "1h"
+      - key: FRONTEND_URL
+        sync: false
+      - key: VERIFICATION_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: EMBED_MODEL
+        value: "nvidia/llama-nemotron-embed-vl-1b-v2"
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: "documents"
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_BASE_URL
+        value: "https://openrouter.ai/api/v1"
+      - key: FAST_MODEL
+        value: "deepseek/deepseek-chat"
+      - key: CHAT_MODEL
+        value: "openai/gpt-oss-120b:free"
+      - key: SMART_MODEL
+        value: "openai/gpt-oss-120b:free"
+      - key: FALLBACK_MODEL
+        value: "openai/gpt-oss-120b:free"
+      - key: RAG_MODE
+        value: "hybrid"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: "ap-south-1"
+      - key: AWS_BUCKET
+        value: "rajesh-rag-storage-160489847268-ap-south-1-an"
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: FREEMODEL_API_KEY
+        sync: false
+      - key: FREEMODEL_BASE_URL
+        value: "https://cc.freemodel.dev"
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: EMAIL_SERVICE
+        value: "gmail"
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
