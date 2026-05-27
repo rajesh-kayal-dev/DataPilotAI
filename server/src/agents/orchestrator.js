@@ -46,7 +46,8 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     // 4. Intent Detection & Logging
     const intent = detectIntent(question);
     const isSummaryQuery = /summarize|summary|overview|key points|explain document/i.test(question) || isSummarizerAgent;
-    
+    const isHelpIntent = intent === 'help_intent';
+
     // 4.5 Document-Check Guardrail (Requested Feature)
     // If user asks for summary/doc analysis but has NOT uploaded any documents
     const isDocRelatedQuery = intent === 'doc_summary' || isSummaryQuery || isCitationAgent;
@@ -220,6 +221,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       isDocFound: intent === 'doc_summary' || isReliable,
       hasDocuments,
       isGreeting: intent === 'greeting',
+      isHelpIntent,
       history,
       mode: effectiveMode,
       regenerate: options.regenerate

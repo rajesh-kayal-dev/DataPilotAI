@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/env.js';
-import { buildRAGPrompt, buildStrictRAGPrompt, buildGeneralPrompt } from '../utils/promptBuilder.js';
+import { buildRAGPrompt, buildStrictRAGPrompt, buildGeneralPrompt, buildHelpPrompt } from '../utils/promptBuilder.js';
 import { buildSummaryPrompt } from '../utils/summaryPromptBuilder.js';
 import { buildCitationPrompt } from '../utils/citationPromptBuilder.js';
 import { logger } from '../utils/logger.js';
@@ -34,6 +34,7 @@ const buildChatMessages = (question, context, options = {}) => {
     isDocFound = true,
     hasDocuments = true,
     isGreeting = false,
+    isHelpIntent = false,
     history = [],
     mode = 'hybrid',
     regenerate = false,
@@ -61,8 +62,9 @@ const buildChatMessages = (question, context, options = {}) => {
   const contextLength = context?.length || 0;
   const hasSufficientContext = contextLength > 50;
 
-  let prompt;
-  if (isCitation && hasSufficientContext) {
+  if (isHelpIntent) {
+    prompt = buildHelpPrompt(question, isGreeting, hasDocuments);
+  } else if (isCitation && hasSufficientContext) {
     prompt = buildCitationPrompt(context, question, citationSources, isGreeting);
   } else if (isSummarizer && hasSufficientContext) {
     prompt = buildSummaryPrompt(context, question, isGreeting);

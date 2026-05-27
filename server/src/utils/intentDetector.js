@@ -1,22 +1,27 @@
 /**
  * Intent Detector
  * Classifies user queries using rule-based keyword matching.
- * Returns: 'greeting' | 'doc_summary' | 'doc_question' | 'advice' | 'general'
+ * Returns: 'greeting' | 'help_intent' | 'doc_summary' | 'doc_question' | 'advice' | 'workspace_info'
  */
 export const detectIntent = (question) => {
   const q = question.toLowerCase().trim();
 
-  // 1. Greetings, Personal Introductions, Memory & Capabilities
-  const greetings = [
-    'hi', 'hii', 'hiii', 'hello', 'hey', 'heyy', 'good morning', 'good evening', 
-    'how are you', 'whats up', 'namaste', 'greeting', 'my name is', 'i am', "i'm",
-    'who are you', 'your name', 'introduce yourself', 'what is yours',
-    'what is my name', 'do you know my name', 'tell me my name', 'who am i',
-    'last question', 'previous question', 'what did i ask', 'our history', 
-    'what was the last thing', 'remember what i said',
+  // 1. Help / Capabilities (asks what the AI can do — describe features)
+  const helpIntent = [
     'how can you help', 'what can you do', 'your goal', 'your purpose',
     'help me', 'who can you help', 'can you help', 'how you help',
     'kisme help kar sakti ho', 'kya kar sakte ho', 'kaise madad karoge',
+  ];
+  if (helpIntent.some(h => q.includes(h))) return 'help_intent';
+
+  // 1.5 Greetings, Personal Introductions, Memory
+  const greetings = [
+    'hi', 'hii', 'hiii', 'hello', 'hey', 'heyy', 'good morning', 'good evening',
+    'how are you', 'whats up', 'namaste', 'greeting', 'my name is', 'i am', "i'm",
+    'who are you', 'your name', 'introduce yourself', 'what is yours',
+    'what is my name', 'do you know my name', 'tell me my name', 'who am i',
+    'last question', 'previous question', 'what did i ask', 'our history',
+    'what was the last thing', 'remember what i said',
     'kaise ho', 'kise ho', 'kya hal hai', 'kya haal hai'
   ];
   if (greetings.some(g => q.includes(g))) return 'greeting';
