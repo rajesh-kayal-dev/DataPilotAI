@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq';
 import { redisClient } from './redis.js';
 import { logger } from '../utils/logger.js';
+import Redis from 'ioredis';
 
 /**
  * Background Job Queues (BullMQ)
@@ -18,8 +19,12 @@ function initQueue() {
     logger.info('BullMQ queue disabled - no REDIS_URL (TCP Redis) configured. Documents processed synchronously.');
     return;
   }
+  const connection = new Redis(redisUrl, {
+    maxRetriesPerRequest: null,
+  });
+
   documentQueue = new Queue('document-processing', {
-    connection: redisUrl
+    connection
   });
   queueReady = true;
   logger.info('BullMQ queue initialized');

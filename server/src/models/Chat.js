@@ -13,6 +13,7 @@ const chatSchema = new mongoose.Schema({
   title: { type: String, default: 'New Chat' },
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  activeDocumentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Document' },
   messages: [messageSchema],
   createdAt: { type: Date, default: Date.now }
 });

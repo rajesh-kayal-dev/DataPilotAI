@@ -1,0 +1,91 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - link "DataPilotAI API Down" [ref=e108] [cursor=pointer]:
+        - /url: /dashboard
+        - img "DataPilotAI" [ref=e7]
+        - generic [ref=e10]: API Down
+      - button [ref=e11]:
+        - img [ref=e12]
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - heading "Workspace" [level=3] [ref=e17]
+          - generic [ref=e18]: "0"
+        - button "T Select Workspace" [ref=e20]:
+          - generic [ref=e21]: T
+          - generic [ref=e22]: Select Workspace
+          - img [ref=e23]
+      - button "New Chat" [ref=e26]:
+        - img [ref=e27]
+        - generic [ref=e29]: New Chat
+      - generic [ref=e30]:
+        - button "Data & Files" [ref=e31]:
+          - heading "Data & Files" [level=3] [ref=e32]
+          - img [ref=e33]
+        - generic [ref=e35]:
+          - generic [ref=e36]: No documents
+          - generic [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e40]: Upload New
+      - generic [ref=e41]:
+        - button "Chat History" [ref=e42]:
+          - heading "Chat History" [level=3] [ref=e43]
+          - img [ref=e44]
+        - generic [ref=e47]: No previous chats
+    - generic [ref=e49]:
+      - button "Profile Guest User Free Plan" [ref=e50]:
+        - img "Profile" [ref=e51]
+        - generic [ref=e52]:
+          - generic [ref=e53]: Guest User
+          - generic [ref=e54]: Free Plan
+      - generic [ref=e150]:
+        - button "Send Feedback" [ref=e151]:
+          - img [ref=e152]
+          - generic [ref=e154]: Send Feedback
+        - button "Upgrade to Pro" [ref=e155]:
+          - img [ref=e156]
+          - generic [ref=e158]: Upgrade to Pro
+        - generic [ref=e160]:
+          - generic [ref=e161]: Search Mode
+          - generic [ref=e162]:
+            - button "Hybrid" [ref=e163]
+            - button "Strict" [ref=e164]
+        - button "Log out" [ref=e166]:
+          - img [ref=e167]
+          - generic [ref=e169]: Log out
+  - generic [ref=e55]:
+    - banner [ref=e56]:
+      - button "Export" [ref=e59]:
+        - generic [ref=e60]: Export
+        - img [ref=e61]
+    - generic [ref=e63]:
+      - generic [ref=e65]:
+        - img [ref=e67]
+        - generic [ref=e69]:
+          - heading "New Chat" [level=2] [ref=e70]
+          - generic [ref=e73]: No documents indexed
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - heading "Good evening" [level=1] [ref=e78]
+          - paragraph [ref=e79]: Ask anything about your documents
+        - generic [ref=e81]:
+          - textbox "Ask anything about your document..." [ref=e82]
+          - generic [ref=e83]:
+            - generic [ref=e84]:
+              - button "Add attachment" [ref=e86]:
+                - img [ref=e87]
+              - button "Agent" [active] [ref=e90]:
+                - img [ref=e109]
+                - generic [ref=e93]: Agent
+                - img [ref=e94]
+            - generic [ref=e96]:
+              - button "Start Voice Typing" [ref=e97]:
+                - img [ref=e98]
+              - button "Send message" [disabled] [ref=e100]:
+                - img [ref=e101]
+        - generic [ref=e103]:
+          - button "Summarize document" [ref=e104]
+          - button "Explain concepts" [ref=e105]
+          - button "Analyze data" [ref=e106]
+          - button "Key takeaways" [ref=e107]

@@ -25,12 +25,13 @@ export const ensureCollection = async () => {
   if (!qdrantAvailable) return;
   try {
     const collections = await client.getCollections();
+    logger.info('Qdrant connected successfully');
     const exists = collections?.collections?.some(c => c.name === COLLECTION_NAME);
 
     if (!exists) {
       await client.createCollection(COLLECTION_NAME, {
         vectors: {
-          size: 2048,
+          size: 768,
           distance: 'Cosine',
         },
       });

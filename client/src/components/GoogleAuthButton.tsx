@@ -2,6 +2,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import axiosInstance from '../utils/axiosInstance';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface GoogleAuthButtonProps {
   buttonText: string;
@@ -10,14 +11,16 @@ interface GoogleAuthButtonProps {
 
 const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ buttonText, isSignup = false }) => {
   const navigate = useNavigate();
+  const { refreshWorkspaces } = useWorkspace();
 
-  const handleSuccess = async (credentialResponse) => {
+  const handleSuccess = async (credentialResponse: any) => {
     try {
       const response = await axiosInstance.post('/auth/google', {
         token: credentialResponse.credential
       });
 
       localStorage.setItem('token', response.data.token);
+      await refreshWorkspaces();
       toast.success(isSignup ? 'Signup successful!' : 'Login successful!');
       navigate('/dashboard');
     } catch (error) {

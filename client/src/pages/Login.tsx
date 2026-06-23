@@ -4,6 +4,7 @@ import Logo from '../components/Logo';
 import toast from 'react-hot-toast';
 import axiosInstance from '../utils/axiosInstance';
 import GoogleAuthButton from '../components/GoogleAuthButton';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +12,7 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { refreshWorkspaces } = useWorkspace();
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -35,6 +37,7 @@ const Login: React.FC = () => {
         password,
       });
       localStorage.setItem('token', response.data.token);
+      await refreshWorkspaces();
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
