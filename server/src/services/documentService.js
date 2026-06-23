@@ -137,7 +137,10 @@ const chunkAndEmbed = async (documentId, text) => {
     points.push(...batchResults);
   }
 
-  await insertVectors(points);
+  const result = await insertVectors(points);
+  if (result && !result.success) {
+    throw new Error(result.error || 'Failed to insert vectors into database');
+  }
 };
 
 export const processDocument = async (documentId) => {

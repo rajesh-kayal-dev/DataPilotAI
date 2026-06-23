@@ -72,7 +72,7 @@ export const insertVectors = async (points) => {
   } catch (error) {
     qdrantAvailable = false;
     logger.error('Vector DB Insert Error', { error: error.message });
-    return { success: true, skipped: true };
+    return { success: false, error: error.message };
   }
 };
 
