@@ -1,0 +1,163 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link "DataPilotAI" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img "DataPilotAI" [ref=e8]
+      - generic [ref=e9]:
+        - link "Features" [ref=e10] [cursor=pointer]:
+          - /url: "#features"
+        - link "How it Works" [ref=e11] [cursor=pointer]:
+          - /url: "#how-it-works"
+        - link "Demo" [ref=e12] [cursor=pointer]:
+          - /url: "#demo"
+        - link "Pricing" [ref=e13] [cursor=pointer]:
+          - /url: "#pricing"
+      - generic [ref=e14]:
+        - link "Chat" [ref=e15] [cursor=pointer]:
+          - /url: /chat
+        - link "Create Workspaces" [ref=e16] [cursor=pointer]:
+          - /url: /create-project
+  - generic [ref=e18]:
+    - generic [ref=e20]: Now in Beta - Join 2,400+ teams
+    - heading "Welcome back, Rajesh Create your next Workspaces" [level=1] [ref=e22]:
+      - text: Welcome back, Rajesh
+      - text: Create your next Workspaces
+    - paragraph [ref=e23]: Hi Rajesh, create a new Workspaces or continue working on your existing projects.
+    - generic [ref=e24]:
+      - link "Create Workspaces" [ref=e25] [cursor=pointer]:
+        - /url: /create-project
+        - text: Create Workspaces
+        - img [ref=e26]
+      - link "See Demo" [ref=e28] [cursor=pointer]:
+        - /url: "#demo"
+        - img [ref=e29]
+        - text: See Demo
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]: 50K+
+        - generic [ref=e34]: Documents processed
+      - generic [ref=e36]:
+        - generic [ref=e37]: 99.2%
+        - generic [ref=e38]: Answer accuracy
+      - generic [ref=e40]:
+        - generic [ref=e41]: <1s
+        - generic [ref=e42]: Average response
+      - generic [ref=e44]:
+        - generic [ref=e45]: 2.4K
+        - generic [ref=e46]: Teams using it
+  - generic [ref=e50]:
+    - generic [ref=e51]:
+      - generic [ref=e52]: Features
+      - heading "Everything you need to build document AI" [level=2] [ref=e53]:
+        - text: Everything you need to build
+        - text: document AI
+      - paragraph [ref=e54]: From upload to insight - a complete AI pipeline with zero infra setup.
+    - generic [ref=e55]:
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - img [ref=e60]
+          - heading "Chat with Documents" [level=3] [ref=e62]
+          - paragraph [ref=e63]: Ask questions in plain English. Get precise answers with source references - pulled directly from your documents using smart RAG retrieval.
+          - generic [ref=e64]:
+            - generic [ref=e65]: Multi-PDF
+            - generic [ref=e66]: Source Citations
+            - generic [ref=e67]: Memory Mode
+        - generic [ref=e68]:
+          - generic [ref=e69]: Live preview
+          - generic [ref=e70]:
+            - paragraph [ref=e72]: What is the refund policy?
+            - generic [ref=e73]:
+              - img [ref=e75]
+              - paragraph [ref=e78]: Based on policy.pdf, p.14 - customers may request a full refund within 30 days of purchase...
+      - generic [ref=e79]:
+        - img [ref=e81]
+        - heading "Multi-Agent AI" [level=3] [ref=e83]
+        - paragraph [ref=e84]: Run parallel AI agents across multiple documents simultaneously. One question, many sources - synthesized into a single clean answer.
+        - generic [ref=e87]: 3 agents running simultaneously
+      - generic [ref=e88]:
+        - img [ref=e90]
+        - heading "Smart Outputs" [level=3] [ref=e92]
+        - paragraph [ref=e93]: Get structured outputs - summaries, tables, bullet lists, or raw JSON. Export directly to Notion, Slack, or your own API endpoint.
+        - generic [ref=e94]:
+          - generic [ref=e95]: JSON
+          - generic [ref=e96]: CSV
+          - generic [ref=e97]: Markdown
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - img [ref=e102]
+          - heading "Semantic Search" [level=3] [ref=e104]
+          - paragraph [ref=e105]: Not keyword matching - real semantic understanding. Find the exact paragraph, table, or clause across thousands of pages in milliseconds using vector embeddings.
+        - generic [ref=e107]:
+          - generic [ref=e108]:
+            - img [ref=e110]
+            - generic [ref=e113]: termination clause in contract...
+          - generic [ref=e114]:
+            - generic [ref=e115]:
+              - generic [ref=e116]: "1."
+              - generic [ref=e117]: Section 12.4 - Employment Contract.pdf
+            - generic [ref=e118]:
+              - generic [ref=e119]: "2."
+              - generic [ref=e120]: Clause 8.1 - Services Agreement.pdf
+  - generic [ref=e124]:
+    - generic [ref=e125]:
+      - generic [ref=e126]: How it Works
+      - heading "From upload to insight in 3 steps" [level=2] [ref=e127]:
+        - text: From upload to insight
+        - text: in 3 steps
+    - generic [ref=e128]:
+      - generic [ref=e129]:
+        - generic [ref=e130]: "01"
+        - img [ref=e132]
+        - heading "Create a Workspaces" [level=3] [ref=e134]
+        - paragraph [ref=e135]: Name your workspace, set the context - legal docs, research, manuals, contracts. Full control from day one.
+      - generic [ref=e136]:
+        - generic [ref=e137]: "02"
+        - img [ref=e139]
+        - heading "Upload Documents" [level=3] [ref=e141]
+        - paragraph [ref=e142]: Drag and drop your PDFs. DataPilotAI auto-chunks, embeds, and indexes your content - ready in seconds.
+      - generic [ref=e143]:
+        - generic [ref=e144]: "03"
+        - img [ref=e146]
+        - heading "Ask Anything" [level=3] [ref=e148]
+        - paragraph [ref=e149]: Chat with your documents in real time. Get cited, accurate answers - or structured summaries with one click.
+  - generic [ref=e154]:
+    - img [ref=e156]
+    - heading "Ready to create your next Workspaces, Rajesh?" [level=2] [ref=e158]:
+      - text: Ready to create your
+      - generic [ref=e159]: next Workspaces, Rajesh?
+    - paragraph [ref=e160]: Create a new Workspaces or continue working on your existing projects.
+    - generic [ref=e161]:
+      - link "Create Workspaces" [ref=e162] [cursor=pointer]:
+        - /url: /create-project
+        - text: Create Workspaces
+        - img [ref=e163]
+      - link "Watch Demo" [ref=e165] [cursor=pointer]:
+        - /url: "#demo"
+        - img [ref=e166]
+        - text: Watch Demo
+    - generic [ref=e168]:
+      - generic [ref=e169]:
+        - img [ref=e170]
+        - text: SOC2 Compliant
+      - generic [ref=e172]:
+        - img [ref=e173]
+        - text: End-to-end encrypted
+      - generic [ref=e175]:
+        - img [ref=e176]
+        - text: Cancel anytime
+  - contentinfo [ref=e178]:
+    - generic [ref=e180]:
+      - img "DataPilotAI" [ref=e182]
+      - generic [ref=e183]:
+        - link "Privacy" [ref=e184] [cursor=pointer]:
+          - /url: "#"
+        - link "Terms" [ref=e185] [cursor=pointer]:
+          - /url: "#"
+        - link "Docs" [ref=e186] [cursor=pointer]:
+          - /url: "#"
+        - link "Status" [ref=e187] [cursor=pointer]:
+          - /url: "#"
+        - link "GitHub" [ref=e188] [cursor=pointer]:
+          - /url: "#"
+      - paragraph [ref=e189]: © 2026 DataPilotAI - Developed by Rajesh

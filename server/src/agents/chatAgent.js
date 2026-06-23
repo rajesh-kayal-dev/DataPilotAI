@@ -62,6 +62,8 @@ const buildChatMessages = (question, context, options = {}) => {
   const contextLength = context?.length || 0;
   const hasSufficientContext = contextLength > 50;
 
+  let prompt;
+
   if (isHelpIntent) {
     prompt = buildHelpPrompt(question, isGreeting, hasDocuments);
   } else if (isCitation && hasSufficientContext) {
@@ -73,7 +75,7 @@ const buildChatMessages = (question, context, options = {}) => {
   } else {
     if (isGreeting) {
       prompt = buildRAGPrompt(context, question, isDocFound, hasDocuments, true);
-    } else if (hasSufficientContext) {
+    } else if (hasDocuments) {
       prompt = buildRAGPrompt(context, question, isDocFound, hasDocuments, false);
     } else {
       prompt = buildGeneralPrompt(question, isGreeting);
@@ -114,27 +116,33 @@ const callOpenRouter = async (chatMessages, selectedModel, isFallback, options) 
     }
   );
 
-  if (onStream) {
-    return new Promise((resolve, reject) => {
-      let fullText = '';
-      response.data.on('data', (chunk) => {
-        const lines = chunk.toString().split('\n').filter(l => l.trim() !== '');
-        for (const line of lines) {
-          if (line.includes('[DONE]')) break;
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              const content = data.choices[0]?.delta?.content || '';
-              fullText += content;
-              onStream(content);
-            } catch (e) {}
+    if (onStream) {
+      return new Promise((resolve, reject) => {
+        let fullText = '';
+        let buffer = '';
+        response.data.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.includes('[DONE]')) break;
+            if (!trimmed) continue;
+            if (trimmed.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(trimmed.slice(6));
+                const content = data.choices[0]?.delta?.content || '';
+                fullText += content;
+                onStream(content);
+              } catch (e) {}
+            }
           }
-        }
+        });
+        response.data.on('end', () => resolve({ success: true, answer: fullText, model: selectedModel }));
+        response.data.on('error', reject);
       });
-      response.data.on('end', () => resolve({ success: true, answer: fullText, model: selectedModel }));
-      response.data.on('error', reject);
-    });
-  }
+    }
 
   const answer = response.data?.choices?.[0]?.message?.content?.trim();
   if (!answer) throw new Error('EMPTY_RESPONSE');
@@ -172,13 +180,19 @@ const callGroq = async (chatMessages, selectedModel, isFallback, options) => {
     if (onStream) {
       return new Promise((resolve, reject) => {
         let fullText = '';
+        let buffer = '';
         response.data.on('data', (chunk) => {
-          const lines = chunk.toString().split('\n').filter(l => l.trim() !== '');
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
           for (const line of lines) {
-            if (line.includes('[DONE]')) break;
-            if (line.startsWith('data: ')) {
+            const trimmed = line.trim();
+            if (trimmed.includes('[DONE]')) break;
+            if (!trimmed) continue;
+            if (trimmed.startsWith('data: ')) {
               try {
-                const data = JSON.parse(line.slice(6));
+                const data = JSON.parse(trimmed.slice(6));
                 const content = data.choices[0]?.delta?.content || '';
                 fullText += content;
                 onStream(content);
@@ -293,10 +307,27 @@ const callGemini = async (chatMessages, selectedModel, isFallback, options) => {
     const systemMsg = chatMessages.find(m => m.role === 'system');
     const historyMsgs = chatMessages.filter(m => m.role !== 'system');
 
-    const contents = historyMsgs.map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+    let contents = [];
+    let lastRole = null;
+
+    for (const msg of historyMsgs) {
+      const role = msg.role === 'assistant' ? 'model' : 'user';
+      if (role === lastRole) {
+        // Merge consecutive messages of the same role
+        contents[contents.length - 1].parts[0].text += '\\n\\n' + msg.content;
+      } else {
+        contents.push({
+          role,
+          parts: [{ text: msg.content }]
+        });
+        lastRole = role;
+      }
+    }
+
+    // Gemini requires the first message to be from 'user'
+    if (contents.length > 0 && contents[0].role !== 'user') {
+      contents.shift();
+    }
 
     const body = {
       contents,
@@ -333,14 +364,24 @@ const callGemini = async (chatMessages, selectedModel, isFallback, options) => {
 
       response.data.on('data', (chunk) => {
         buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        
+        // SSE events are separated by double newlines (\n\n or \r\n\r\n)
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() || '';
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          const jsonStr = trimmed.slice(6);
-          if (jsonStr === '[DONE]') break;
+        for (const event of events) {
+          if (event.includes('[DONE]')) break;
+          
+          let jsonStr = '';
+          const lines = event.split(/\r?\n/);
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              jsonStr += line.slice(6);
+            }
+          }
+          
+          if (!jsonStr) continue;
+          
           try {
             const data = JSON.parse(jsonStr);
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -352,7 +393,27 @@ const callGemini = async (chatMessages, selectedModel, isFallback, options) => {
         }
       });
 
-      response.data.on('end', () => resolve({ success: true, answer: fullText, model: selectedModel }));
+      response.data.on('end', () => {
+        // Process any remaining buffer that wasn't properly terminated
+        if (buffer) {
+          let jsonStr = '';
+          const lines = buffer.split(/\r?\n/);
+          for (const line of lines) {
+            if (line.startsWith('data: ')) jsonStr += line.slice(6);
+          }
+          if (jsonStr && !jsonStr.includes('[DONE]')) {
+            try {
+              const data = JSON.parse(jsonStr);
+              const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (text) {
+                fullText += text;
+                onStream(text);
+              }
+            } catch (e) {}
+          }
+        }
+        resolve({ success: true, answer: fullText, model: selectedModel });
+      });
       response.data.on('error', reject);
     });
   }
@@ -371,8 +432,8 @@ const callGemini = async (chatMessages, selectedModel, isFallback, options) => {
  * Routes to OpenRouter, Freemodel, or Gemini based on apiProvider option.
  */
 export const generateAnswer = async (question, context, model, options = {}) => {
-  const { onStream, retryCount = 0, isFallback = false, apiProvider = 'openrouter' } = options;
-  const selectedModel = model || config.openrouter.chatModel;
+  const { onStream, retryCount = 0, isFallback = false, apiProvider = 'groq' } = options;
+  const selectedModel = model || 'llama-3.1-8b-instant';
 
   if (retryCount > config.llm.retries) {
     logger.error('Max retries exceeded for LLM request', { userId: options.userId, model: selectedModel });
@@ -413,10 +474,10 @@ export const generateAnswer = async (question, context, model, options = {}) => 
         response: errorResponse 
       });
       
-      // Always use openrouter for fallback — fallbackModel is always an OpenRouter model string
-      const fallbackResult = await generateAnswer(question, context, config.openrouter.fallbackModel, { 
+      // Use Groq for fallback since OpenRouter/Gemini key might be failing
+      const fallbackResult = await generateAnswer(question, context, 'llama-3.1-8b-instant', { 
         ...options,
-        apiProvider: 'openrouter',
+        apiProvider: 'groq',
         isFallback: true, 
         retryCount: retryCount + 1 
       });
@@ -425,6 +486,14 @@ export const generateAnswer = async (question, context, model, options = {}) => 
     logger.error('Fallback Model Failed', { errorMessage: errorMsg });
     return { success: false, error: 'System busy, please try again.', model: selectedModel };
   };
+
+  if (isFallback || apiProvider !== 'openrouter') {
+    try {
+      return await apiAction();
+    } catch (err) {
+      return await fallbackHandler(err);
+    }
+  }
 
   return await llmCircuitBreaker.execute(apiAction, fallbackHandler);
 };

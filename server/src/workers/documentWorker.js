@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import { processDocument } from '../services/documentService.js';
 import { logger } from '../utils/logger.js';
+import Redis from 'ioredis';
 
 /**
  * Document Processing Worker
@@ -17,6 +18,10 @@ function initWorker() {
     return;
   }
 
+  const connection = new Redis(redisUrl, {
+    maxRetriesPerRequest: null,
+  });
+
   worker = new Worker('document-processing', async (job) => {
     const { documentId, userId } = job.data;
     
@@ -31,7 +36,7 @@ function initWorker() {
       throw error;
     }
   }, {
-    connection: redisUrl
+    connection
   });
 
   worker.on('failed', (job, err) => {

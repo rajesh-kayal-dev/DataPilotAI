@@ -8,7 +8,7 @@ import Document from '../models/Document.js';
  * Research Agent (Production V5)
  * - Intelligent source attribution: Returns only the names of documents that actually matched the query.
  */
-export const retrieveContext = async (question, documentIds, isSummary = false, includeChunkMeta = false) => {
+export const retrieveContext = async (question, documentIds, isSummary = false, includeChunkMeta = false, workspaceId = null, userId = null) => {
   // 0. Fetch Document Metadata
   const docsMetadata = await Document.find({ _id: { $in: documentIds } }).select('name');
   const docNamesMap = docsMetadata.reduce((acc, doc) => {
@@ -135,6 +135,34 @@ export const retrieveContext = async (question, documentIds, isSummary = false, 
       rerankScore: c.score,
     }));
     console.log(`Fallback: using top ${finalChunks.length} raw results (lowest score: ${finalChunks[finalChunks.length-1].score.toFixed(3)})`);
+  }
+
+  // 5c. Global Workspace Fallback (User Request): If no chunks found, search all documents in workspace
+  if (finalChunks.length === 0 && workspaceId && userId) {
+    console.log('No relevant chunks found in active document, falling back to all workspace documents');
+    const allDocs = await Document.find({ workspaceId, userId, status: 'completed' }).select('_id name');
+    const allDocIds = allDocs.map(d => d._id.toString());
+    
+    if (allDocIds.length > 0) {
+      const globalRawResults = await searchVectors(queryEmbedding, allDocIds);
+      const globalCandidates = globalRawResults.filter(item => item.score >= looseThreshold);
+      
+      if (globalCandidates.length > 0) {
+        const { calculateAlignment } = await import('../utils/alignmentCheck.js');
+        const reranked = globalCandidates.map(chunk => {
+          const alignmentScore = calculateAlignment(question, [chunk]);
+          const rerankScore = (chunk.score * 0.4) + (alignmentScore * 0.6);
+          return { ...chunk, alignmentScore, rerankScore };
+        });
+        reranked.sort((a, b) => b.rerankScore - a.rerankScore);
+        finalChunks = reranked.slice(0, config.rag.topK);
+        
+        // Update docNamesMap with the new docs
+        allDocs.forEach(doc => {
+          docNamesMap[doc._id.toString()] = doc.name;
+        });
+      }
+    }
   }
 
   // 5. Global Context Injection (Theme)

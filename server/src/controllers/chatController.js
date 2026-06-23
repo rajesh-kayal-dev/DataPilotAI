@@ -16,8 +16,69 @@ export const handleChat = async (req, res) => {
 
   try {
     const Document = (await import('../models/Document.js')).default;
-    const docs = await Document.find({ workspaceId, userId, status: 'completed' }).select('_id');
-    const targetDocumentIds = docs.map(d => d._id.toString());
+    const Chat = (await import('../models/Chat.js')).default;
+    
+    let chatSession;
+    if (chatId) {
+      chatSession = await Chat.findOne({ _id: chatId, user: userId, workspaceId });
+    }
+
+    const docs = await Document.find({ workspaceId, userId }).select('_id name status');
+    let targetDocumentIds = [];
+    let activeDocumentIdToSave = null;
+    let needsSelection = false;
+    let selectionMessage = '';
+
+    if (chatSession && chatSession.activeDocumentId) {
+      targetDocumentIds = [chatSession.activeDocumentId.toString()];
+      activeDocumentIdToSave = chatSession.activeDocumentId;
+    } else {
+      if (docs.length === 0) {
+        targetDocumentIds = [];
+      } else if (docs.length === 1) {
+        targetDocumentIds = [docs[0]._id.toString()];
+        activeDocumentIdToSave = docs[0]._id;
+      } else {
+        const queryLower = question.toLowerCase();
+        
+        // Match explicit reference like "this document", "my resume", "that pdf"
+        const explicitRef = ['this document', 'my resume', 'that pdf'].some(ref => queryLower.includes(ref));
+        
+        const matchedDoc = docs.find(d => {
+           const nameLower = d.name.toLowerCase();
+           return queryLower.includes(nameLower) || queryLower.includes(nameLower.split('.')[0]);
+        });
+
+        if (matchedDoc) {
+           targetDocumentIds = [matchedDoc._id.toString()];
+           activeDocumentIdToSave = matchedDoc._id;
+        } else {
+           const isNumber = /^\s*\d+\s*$/.test(question);
+           if (isNumber) {
+              const index = parseInt(question.trim(), 10) - 1;
+              if (index >= 0 && index < docs.length) {
+                 targetDocumentIds = [docs[index]._id.toString()];
+                 activeDocumentIdToSave = docs[index]._id;
+                 needsSelection = false;
+                 // Set a special flag to bypass LLM and just return a confirmation
+                 req.documentSelected = docs[index].name;
+              } else {
+                 needsSelection = true;
+              }
+           } else if (!explicitRef) {
+              needsSelection = true;
+           } else {
+              // They said "this document" but didn't specify which and no active document is set
+              needsSelection = true;
+           }
+        }
+      }
+    }
+
+    if (needsSelection) {
+      selectionMessage = "Please select a document to chat with:\n\n" + docs.map((d, i) => `${i + 1}. ${d.name}`).join('\n');
+    }
+
     const history = await getSessionHistory(chatId, userId, workspaceId);
 
     if (stream) {
@@ -28,22 +89,32 @@ export const handleChat = async (req, res) => {
 
       let fullAnswer = '';
 
-      // 2. Process with onStream callback
-      const result = await processChatFlow(question, targetDocumentIds, userId, { 
-        workspaceId,
-        history,
-        regenerate,
-        mode,
-        selectedAgent,
-        webSearch,
-        onStream: (chunk) => {
-          fullAnswer += chunk;
-          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-        },
-        onStatus: (msg) => {
-          res.write(`data: ${JSON.stringify({ status: msg })}\n\n`);
-        }
-      });
+      // 2. Process with onStream callback or Bypass
+      let result;
+      if (needsSelection) {
+        res.write(`data: ${JSON.stringify({ chunk: selectionMessage })}\n\n`);
+        result = { success: true, answer: selectionMessage, model: 'system', confidence: 1, source: 'System' };
+      } else if (req.documentSelected) {
+        const confirmMsg = `I have selected **${req.documentSelected}**. What would you like to know about it?`;
+        res.write(`data: ${JSON.stringify({ chunk: confirmMsg })}\n\n`);
+        result = { success: true, answer: confirmMsg, model: 'system', confidence: 1, source: 'System' };
+      } else {
+        result = await processChatFlow(question, targetDocumentIds, userId, { 
+          workspaceId,
+          history,
+          regenerate,
+          mode,
+          selectedAgent,
+          webSearch,
+          onStream: (chunk) => {
+            fullAnswer += chunk;
+            res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+          },
+          onStatus: (msg) => {
+            res.write(`data: ${JSON.stringify({ status: msg })}\n\n`);
+          }
+        });
+      }
 
       if (!result.success) {
         res.write(`data: ${JSON.stringify({ error: result.error })}\n\n`);
@@ -63,6 +134,11 @@ export const handleChat = async (req, res) => {
       } else {
         chatSession = await appendToHistory(chatId, userId, question, fullAnswer, workspaceId, result);
       }
+
+      if (activeDocumentIdToSave && (!chatSession.activeDocumentId || chatSession.activeDocumentId.toString() !== activeDocumentIdToSave.toString())) {
+         chatSession.activeDocumentId = activeDocumentIdToSave;
+         await chatSession.save();
+      }
       
       // Send final metadata
       res.write(`data: ${JSON.stringify({ 
@@ -77,22 +153,34 @@ export const handleChat = async (req, res) => {
       return res.end();
     } else {
       // Standard non-streaming flow
-      const result = await processChatFlow(question, targetDocumentIds, userId, { 
-        workspaceId,
-        history,
-        mode,
-        selectedAgent,
-        webSearch,
-      });
+      let result;
+      if (needsSelection) {
+        result = { success: true, answer: selectionMessage, model: 'system', confidence: 1, source: 'System' };
+      } else if (req.documentSelected) {
+        result = { success: true, answer: `I have selected **${req.documentSelected}**. What would you like to know about it?`, model: 'system', confidence: 1, source: 'System' };
+      } else {
+        result = await processChatFlow(question, targetDocumentIds, userId, { 
+          workspaceId,
+          history,
+          mode,
+          selectedAgent,
+          webSearch,
+        });
+      }
       
       if (!result.success) return res.status(500).json(result);
 
-      const chatSession = await appendToHistory(chatId, userId, question, result.answer, workspaceId);
+      const savedChatSession = await appendToHistory(chatId, userId, question, result.answer, workspaceId);
+      
+      if (activeDocumentIdToSave && (!savedChatSession.activeDocumentId || savedChatSession.activeDocumentId.toString() !== activeDocumentIdToSave.toString())) {
+         savedChatSession.activeDocumentId = activeDocumentIdToSave;
+         await savedChatSession.save();
+      }
 
       return res.json({
         ...result,
-        chatId: chatSession._id,
-        title: chatSession.title
+        chatId: savedChatSession._id,
+        title: savedChatSession.title
       });
     }
 

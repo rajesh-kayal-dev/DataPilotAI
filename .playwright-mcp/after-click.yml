@@ -1,0 +1,190 @@
+- generic [ref=e3] [box=0,0,1365,893]:
+  - complementary [ref=e4] [box=0,0,256,893]:
+    - generic [ref=e5] [box=0,0,255,64]:
+      - link "DataPilotAI Premium" [ref=e6] [cursor=pointer] [box=16,4,180,56]:
+        - /url: /dashboard
+        - img "DataPilotAI" [ref=e7] [box=16,4,112,56]
+        - generic [ref=e10] [box=156,25,40,13]: Premium
+      - button [ref=e11] [box=207,16,32,32]:
+        - img [ref=e12] [box=213,22,20,20]
+    - generic [ref=e14] [box=0,64,255,752]:
+      - generic [ref=e15] [box=12,80,227,69]:
+        - generic [ref=e16] [box=12,80,227,19]:
+          - heading "Workspace" [level=3] [ref=e17] [box=24,82,65,14]
+          - generic [ref=e18] [box=208,80,19,19]: "2"
+        - button "M My Workspace" [ref=e20] [box=12,107,227,42]:
+          - generic [ref=e21] [box=25,118,20,20]: M
+          - generic [ref=e22] [box=57,119,87,19]: My Workspace
+          - img [ref=e23] [box=210,120,16,16]
+      - button "New Chat" [ref=e26] [box=12,173,227,42]:
+        - img [ref=e27] [box=29,186,16,16]
+        - generic [ref=e29] [box=57,184,62,20]: New Chat
+      - generic [ref=e30] [box=12,239,227,186]:
+        - button "Data & Files" [ref=e31] [box=12,239,227,14]:
+          - heading "Data & Files" [level=3] [ref=e32] [box=16,239,70,14]
+          - img [ref=e33] [box=223,240,12,12]
+        - generic [ref=e35] [box=12,261,227,164]:
+          - generic [ref=e37] [box=12,261,227,38]:
+            - generic [ref=e38] [box=20,270,137,20]:
+              - img [ref=e39] [box=20,272,16,16]
+              - generic [ref=e42] [box=48,270,109,20]: dbms_tutorial.pdf
+            - generic [ref=e43] [box=185,269,46,22]:
+              - button "Re-embed" [ref=e44] [box=185,269,22,22]:
+                - img [ref=e45] [box=189,273,14,14]
+              - button "Delete" [ref=e47] [box=209,269,22,22]:
+                - img [ref=e48] [box=213,273,14,14]
+          - generic [ref=e51] [box=12,303,227,38]:
+            - generic [ref=e52] [box=20,312,165,20]:
+              - img [ref=e53] [box=20,314,16,16]
+              - generic [ref=e56] [box=48,312,137,20]: DBUU-Brochure-2026_compressed (1).pdf
+            - generic [ref=e57] [box=185,311,46,22]:
+              - button "Re-embed" [ref=e58] [box=185,311,22,22]:
+                - img [ref=e59] [box=189,315,14,14]
+              - button "Delete" [ref=e61] [box=209,311,22,22]:
+                - img [ref=e62] [box=213,315,14,14]
+          - generic [ref=e65] [box=12,345,227,38]:
+            - generic [ref=e66] [box=20,354,165,20]:
+              - img [ref=e67] [box=20,356,16,16]
+              - generic [ref=e70] [box=48,354,137,20]: Program Grid_MCA 2024.pdf
+            - generic [ref=e71] [box=185,353,46,22]:
+              - button "Re-embed" [ref=e72] [box=185,353,22,22]:
+                - img [ref=e73] [box=189,357,14,14]
+              - button "Delete" [ref=e75] [box=209,353,22,22]:
+                - img [ref=e76] [box=213,357,14,14]
+          - generic [ref=e78] [cursor=pointer] [box=12,391,227,34]:
+            - img [ref=e79] [box=21,400,16,16]
+            - generic [ref=e81] [box=45,400,66,16]: Upload New
+      - generic [ref=e82] [box=12,449,227,378]:
+        - button "Chat History" [ref=e83] [box=12,449,227,14]:
+          - heading "Chat History" [level=3] [ref=e84] [box=16,449,77,14]
+          - img [ref=e85] [box=223,450,12,12]
+        - generic [ref=e87] [box=12,471,227,356]:
+          - generic [ref=e88] [cursor=pointer] [box=12,471,227,36]:
+            - generic [ref=e89] [box=20,479,167,20]:
+              - img [ref=e90] [box=20,481,16,16]
+              - generic [ref=e92] [box=48,479,139,20]: What are the latest developmen...
+            - generic [ref=e93] [box=187,479,44,20]:
+              - button [ref=e94] [box=187,479,20,20]:
+                - img [ref=e95] [box=191,483,12,12]
+              - button [ref=e97] [box=211,479,20,20]:
+                - img [ref=e98] [box=215,483,12,12]
+          - generic [ref=e100] [cursor=pointer] [box=12,511,227,36]:
+            - generic [ref=e101] [box=20,519,167,20]:
+              - img [ref=e102] [box=20,521,16,16]
+              - generic [ref=e104] [box=48,519,139,20]: Semester‑wise curriculum
+            - generic [ref=e105] [box=187,519,44,20]:
+              - button [ref=e106] [box=187,519,20,20]:
+                - img [ref=e107] [box=191,523,12,12]
+              - button [ref=e109] [box=211,519,20,20]:
+                - img [ref=e110] [box=215,523,12,12]
+          - generic [ref=e112] [cursor=pointer] [box=12,551,227,36]:
+            - generic [ref=e113] [box=20,559,167,20]:
+              - img [ref=e114] [box=20,561,16,16]
+              - generic [ref=e116] [box=48,559,139,20]: Semester‑wise curriculum
+            - generic [ref=e117] [box=187,559,44,20]:
+              - button [ref=e118] [box=187,559,20,20]:
+                - img [ref=e119] [box=191,563,12,12]
+              - button [ref=e121] [box=211,559,20,20]:
+                - img [ref=e122] [box=215,563,12,12]
+          - generic [ref=e124] [cursor=pointer] [box=12,591,227,36]:
+            - generic [ref=e125] [box=20,599,167,20]:
+              - img [ref=e126] [box=20,601,16,16]
+              - generic [ref=e128] [box=48,599,139,20]: Semester‑wise curriculum
+            - generic [ref=e129] [box=187,599,44,20]:
+              - button [ref=e130] [box=187,599,20,20]:
+                - img [ref=e131] [box=191,603,12,12]
+              - button [ref=e133] [box=211,599,20,20]:
+                - img [ref=e134] [box=215,603,12,12]
+          - generic [ref=e136] [cursor=pointer] [box=12,631,227,36]:
+            - generic [ref=e137] [box=20,639,167,20]:
+              - img [ref=e138] [box=20,641,16,16]
+              - generic [ref=e140] [box=48,639,139,20]: what the docoment is abount
+            - generic [ref=e141] [box=187,639,44,20]:
+              - button [ref=e142] [box=187,639,20,20]:
+                - img [ref=e143] [box=191,643,12,12]
+              - button [ref=e145] [box=211,639,20,20]:
+                - img [ref=e146] [box=215,643,12,12]
+          - generic [ref=e148] [cursor=pointer] [box=12,671,227,36]:
+            - generic [ref=e149] [box=20,679,167,20]:
+              - img [ref=e150] [box=20,681,16,16]
+              - generic [ref=e152] [box=48,679,139,20]: what the docoment is abount
+            - generic [ref=e153] [box=187,679,44,20]:
+              - button [ref=e154] [box=187,679,20,20]:
+                - img [ref=e155] [box=191,683,12,12]
+              - button [ref=e157] [box=211,679,20,20]:
+                - img [ref=e158] [box=215,683,12,12]
+          - generic [ref=e160] [cursor=pointer] [box=12,711,227,36]:
+            - generic [ref=e161] [box=20,719,167,20]:
+              - img [ref=e162] [box=20,721,16,16]
+              - generic [ref=e164] [box=48,719,139,20]: what this docoment is about
+            - generic [ref=e165] [box=187,719,44,20]:
+              - button [ref=e166] [box=187,719,20,20]:
+                - img [ref=e167] [box=191,723,12,12]
+              - button [ref=e169] [box=211,719,20,20]:
+                - img [ref=e170] [box=215,723,12,12]
+          - generic [ref=e172] [cursor=pointer] [box=12,751,227,36]:
+            - generic [ref=e173] [box=20,759,167,20]:
+              - img [ref=e174] [box=20,761,16,16]
+              - generic [ref=e176] [box=48,759,11,20]: hi
+            - generic [ref=e177] [box=187,759,44,20]:
+              - button [ref=e178] [box=187,759,20,20]:
+                - img [ref=e179] [box=191,763,12,12]
+              - button [ref=e181] [box=211,759,20,20]:
+                - img [ref=e182] [box=215,763,12,12]
+          - generic [ref=e184] [cursor=pointer] [box=12,791,227,36]:
+            - generic [ref=e185] [box=20,799,167,20]:
+              - img [ref=e186] [box=20,801,16,16]
+              - generic [ref=e188] [box=48,799,138,20]: HI , HOw can you help
+            - generic [ref=e189] [box=187,799,44,20]:
+              - button [ref=e190] [box=187,799,20,20]:
+                - img [ref=e191] [box=191,803,12,12]
+              - button [ref=e193] [box=211,799,20,20]:
+                - img [ref=e194] [box=215,803,12,12]
+    - button "Profile Rajesh Premium" [ref=e198] [box=12,829,231,52]:
+      - img "Profile" [ref=e199] [box=20,839,32,32]
+      - generic [ref=e200] [box=64,837,62,36]:
+        - generic [ref=e201] [box=64,837,62,20]: Rajesh
+        - generic [ref=e202] [box=64,857,62,16]: Premium
+  - generic [ref=e203] [box=256,0,1109,893]:
+    - banner [ref=e204] [box=256,0,1109,64]:
+      - generic [ref=e205] [box=280,13,287,38]:
+        - button "Active Model (Blue) MiMo V2 Flash" [ref=e207] [box=280,13,174,38]:
+          - generic "Active Model (Blue)" [ref=e208] [box=297,28,8,8]
+          - generic [ref=e209] [box=317,22,92,20]: MiMo V2 Flash
+          - img [ref=e210] [box=421,24,16,16]
+        - generic [ref=e212] [box=470,47,97,24]:
+          - img [ref=e213] [box=483,53,14,14]
+          - generic [ref=e215] [box=503,52,51,14]: Premium
+      - button "Export" [ref=e218] [box=1249,17,92,30]:
+        - generic [ref=e219] [box=1266,24,36,16]: Export
+        - img [ref=e220] [box=1310,25,14,14]
+    - generic [ref=e222] [box=256,64,1109,829]:
+      - generic [ref=e224] [box=280,80,558,34]:
+        - img [ref=e226] [box=286,87,20,20]
+        - generic [ref=e228] [box=324,80,514,34]:
+          - heading "New Chat" [level=2] [ref=e229] [box=324,80,448,20]
+          - generic [ref=e232] [box=338,100,500,14]: "Chatting with: dbms_tutorial.pdf, DBUU-Brochure-2026_compressed (1).pdf, Program Grid_MCA 2024.pdf"
+      - generic [ref=e235] [box=475,364,672,293]:
+        - generic [ref=e236] [box=666,364,290,64]:
+          - heading "Good evening, Rajesh" [level=1] [ref=e237] [box=666,364,290,36]
+          - paragraph [ref=e238] [box=666,408,290,20]: Ask anything about your documents
+        - generic [ref=e240] [box=475,460,672,135]:
+          - textbox "Ask anything about your document..." [ref=e241] [box=492,477,638,44]
+          - generic [ref=e242] [box=492,537,638,41]:
+            - generic [ref=e243] [box=492,546,137,32]:
+              - button "Add attachment" [ref=e245] [box=492,546,32,32]:
+                - img [ref=e246] [box=500,554,16,16]
+              - button "Agent" [active] [ref=e249] [box=532,547,97,30]:
+                - img [ref=e250] [box=545,555,14,14]
+                - generic [ref=e252] [box=565,554,33,16]: Agent
+                - img [ref=e253] [box=604,556,12,12]
+            - generic [ref=e255] [box=1058,546,72,32]:
+              - button "Start Voice Typing" [ref=e256] [box=1058,546,32,32]:
+                - img [ref=e257] [box=1066,554,16,16]
+              - button "Send message" [disabled] [ref=e259] [box=1098,546,32,32]:
+                - img [ref=e260] [box=1106,554,16,16]
+        - generic [ref=e262] [box=566,627,489,30]:
+          - button "Summarize document" [ref=e263] [box=566,627,143,30]
+          - button "Explain concepts" [ref=e264] [box=717,627,117,30]
+          - button "Analyze data" [ref=e265] [box=843,627,98,30]
+          - button "Key takeaways" [ref=e266] [box=949,627,106,30]

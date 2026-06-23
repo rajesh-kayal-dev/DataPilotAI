@@ -97,7 +97,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
       if (isSummarizerAgent && onStatus) onStatus('Reading document...');
       if (isCitationAgent && onStatus) onStatus('Verifying sources...');
       const includeChunkMeta = isCitationAgent;
-      const retrievalResult = await retrieveContext(question, docIdsArray, isSummaryQuery || intent === 'doc_summary', includeChunkMeta);
+      const retrievalResult = await retrieveContext(question, docIdsArray, isSummaryQuery || intent === 'doc_summary', includeChunkMeta, workspaceId, userId);
       context = retrievalResult.context;
       confidence = retrievalResult.confidence;
       alignment = retrievalResult.alignment;
@@ -177,7 +177,7 @@ export const processChatFlow = async (question, documentIds, userId, options = {
     // 6. Model Resolution & User Identity
     let modelId;
     let userSelectedModelId = null;
-    let apiProvider = 'openrouter';
+    let apiProvider = 'groq';
     let userName = 'User';
     let userEmail = '';
 

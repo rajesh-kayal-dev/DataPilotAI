@@ -29,15 +29,15 @@ export const generateEmbedding = async (text, retries = 2) => {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const response = await axios.post(
-        EMBEDDING_URL,
+        'https://api.jina.ai/v1/embeddings',
         {
-          model: config.ollama.embedModel,
-          input: text
+          model: 'jina-embeddings-v2-base-en',
+          input: [text]
         },
         {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.openrouter.apiKey}`
+            'Authorization': `Bearer ${config.jina.apiKey}`,
+            'Content-Type': 'application/json'
           },
           timeout: 10000 // 10s hard timeout per attempt
         }

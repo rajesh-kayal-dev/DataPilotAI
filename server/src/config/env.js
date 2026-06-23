@@ -81,5 +81,9 @@ export const config = {
 
   tavily: {
     apiKey: process.env.TAVILY_API_KEY,
+  },
+
+  jina: {
+    apiKey: process.env.JINA_API_KEY,
   }
 };
