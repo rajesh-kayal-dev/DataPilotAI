@@ -2,7 +2,6 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import Tesseract from 'tesseract.js';
 import { createCanvas } from 'canvas';
 import Document from '../models/Document.js';
-import { generateEmbedding } from './embeddingService.js';
 import { insertVectors, deleteVectorsByDocId } from './vectorService.js';
 import { v4 as uuidv4 } from 'uuid';
 import { createRequire } from 'module';
@@ -116,28 +115,29 @@ const chunkAndEmbed = async (documentId, text) => {
     if (c.trim().length > 40) chunks.push(c.trim());
   });
 
-  const CONCURRENCY_LIMIT = 5;
-  const points = [];
-  for (let i = 0; i < chunks.length; i += CONCURRENCY_LIMIT) {
-    const batch = chunks.slice(i, i + CONCURRENCY_LIMIT);
-    const batchPromises = batch.map(async (chunk, index) => {
-      const actualIndex = i + index;
-      const embedding = await generateEmbedding(chunk);
-      return {
-        id: uuidv4(),
-        vector: embedding,
-        payload: {
-          docId: documentId.toString(),
-          content: chunk,
-          chunkIndex: actualIndex,
-        },
-      };
-    });
-    const batchResults = await Promise.all(batchPromises);
-    points.push(...batchResults);
+  if (chunks.length === 0) return;
+
+  const { jinaEmbeddings } = await import('../embeddings/jina.js');
+  if (!jinaEmbeddings) {
+    throw new Error('Jina Embeddings service is not configured/available');
   }
 
-  await insertVectors(points);
+  const embeddings = await jinaEmbeddings.embedDocuments(chunks);
+
+  const points = chunks.map((chunk, index) => ({
+    id: uuidv4(),
+    vector: embeddings[index],
+    payload: {
+      docId: documentId.toString(),
+      content: chunk,
+      chunkIndex: index,
+    },
+  }));
+
+  const result = await insertVectors(points);
+  if (result && !result.success) {
+    throw new Error(result.error || 'Failed to insert vectors into database');
+  }
 };
 
 export const processDocument = async (documentId) => {

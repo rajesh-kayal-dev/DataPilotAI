@@ -1,0 +1,124 @@
+# =============================================================================
+# DataPilotAI — Local Development Stack
+# =============================================================================
+# Services:
+#   app      → DataPilotAI backend (TypeScript/Node.js)
+#   mongodb  → Document database (users, chats, documents, workspaces)
+#   redis    → Queue + caching (BullMQ via ioredis; REST via Upstash in prod)
+#   qdrant   → Vector database (768-dim document embeddings)
+#
+# Usage:
+#   docker compose up -d           # Start all services in background
+#   docker compose up app          # Start only the backend (assumes DBs running)
+#   docker compose logs -f app     # Stream backend logs
+#   docker compose down -v         # Stop and remove volumes (fresh start)
+# =============================================================================
+
+version: '3.9'
+
+services:
+
+  # ── DataPilotAI Backend ─────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: datapilotai-server
+    ports:
+      - "${PORT:-5000}:5000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # Override with local Docker service URLs when running in compose
+      MONGODB_URI: mongodb://mongodb:27017/datapilotai
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - datapilotai-net
+    # Mount .env at runtime so secrets are never baked into the image
+    volumes:
+      - ./.env:/app/.env:ro
+
+  # ── MongoDB ─────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: datapilotai-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: datapilotai
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - datapilotai-net
+
+  # ── Redis (TCP — BullMQ document processing queue) ───────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: datapilotai-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - datapilotai-net
+
+  # ── Qdrant Vector Database ───────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: datapilotai-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    restart: unless-stopped
+    networks:
+      - datapilotai-net
+
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+    name: datapilotai_mongo_data
+  mongo_config:
+    name: datapilotai_mongo_config
+  redis_data:
+    name: datapilotai_redis_data
+  qdrant_data:
+    name: datapilotai_qdrant_data
+
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  datapilotai-net:
+    name: datapilotai-network
+    driver: bridge

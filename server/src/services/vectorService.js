@@ -65,14 +65,15 @@ export const insertVectors = async (points) => {
     if (!qdrantAvailable) {
       return { success: true, skipped: true };
     }
-    return await client.upsert(COLLECTION_NAME, {
+    await client.upsert(COLLECTION_NAME, {
       wait: true,
       points,
     });
+    return { success: true };
   } catch (error) {
     qdrantAvailable = false;
     logger.error('Vector DB Insert Error', { error: error.message });
-    return { success: true, skipped: true };
+    return { success: false, error: error.message };
   }
 };
 
