@@ -157,6 +157,13 @@ const callGroq = async (chatMessages, selectedModel, isFallback, options) => {
   const { onStream } = options;
 
   try {
+    JSON.stringify(chatMessages);
+    logger.info('chatMessages is safe for JSON serialization');
+  } catch (err) {
+    logger.error('chatMessages contains circular references!', { error: err.message, chatMessages });
+  }
+
+  try {
     const response = await axios.post(
       `${config.groq.baseUrl}/chat/completions`,
       {
