@@ -7,13 +7,28 @@ const isDevelopment = (process.env.NODE_ENV ?? "development") !== "production";
 // Formatters
 // ---------------------------------------------------------------------------
 
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (key: any, value: any) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) {
+        return "[Circular]";
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
+
 const devFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   winston.format.timestamp({ format: "HH:mm:ss" }),
   winston.format.errors({ stack: true }),
   winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
     const metaStr =
-      Object.keys(meta).length > 0 ? " " + JSON.stringify(meta, null, 2) : "";
+      Object.keys(meta).length > 0
+        ? " " + JSON.stringify(meta, getCircularReplacer(), 2)
+        : "";
     return stack
       ? `[${timestamp}] ${level}: ${message}\n${stack}${metaStr}`
       : `[${timestamp}] ${level}: ${message}${metaStr}`;
