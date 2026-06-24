@@ -433,7 +433,7 @@ const callGemini = async (chatMessages, selectedModel, isFallback, options) => {
  */
 export const generateAnswer = async (question, context, model, options = {}) => {
   const { onStream, retryCount = 0, isFallback = false, apiProvider = 'groq' } = options;
-  const selectedModel = model || 'llama-3.1-8b-instant';
+  const selectedModel = model || 'llama-3.3-70b-versatile';
 
   if (retryCount > config.llm.retries) {
     logger.error('Max retries exceeded for LLM request', { userId: options.userId, model: selectedModel });
@@ -475,7 +475,7 @@ export const generateAnswer = async (question, context, model, options = {}) => 
       });
       
       // Use Groq for fallback since OpenRouter/Gemini key might be failing
-      const fallbackResult = await generateAnswer(question, context, 'llama-3.1-8b-instant', { 
+      const fallbackResult = await generateAnswer(question, context, 'llama-3.3-70b-versatile', { 
         ...options,
         apiProvider: 'groq',
         isFallback: true, 

@@ -35,7 +35,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     id: 'groq-llama-8b',
     label: 'Llama 3.1 8B',
     provider: 'Groq',
-    model: 'llama-3.1-8b-instant',
+    model: 'llama3-8b-8192',
     type: 'free',
     tier: 'fast',
     badge: 'Instant',
