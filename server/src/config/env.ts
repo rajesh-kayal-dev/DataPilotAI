@@ -84,7 +84,7 @@ const envSchema = z.object({
 
   // RAG tuning
   RAG_MODE: z.string().default("strict"),
-  RAG_THRESHOLD: z.string().default("0.65"),
+  RAG_THRESHOLD: z.string().default("0.5"),
   RAG_ALIGNMENT_THRESHOLD: z.string().default("0.35"),
   RAG_TOP_K: z.string().default("5"),
 
