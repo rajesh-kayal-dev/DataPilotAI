@@ -13,6 +13,7 @@ const router = express.Router();
 router.get('/', procted, getDocuments);
 router.post('/upload', procted, upload.single('document'), handleUpload);
 router.post('/:id/reembed', procted, handleReembed);
+router.delete('/:id', procted, handleDeleteDocument);
 router.get('/:id/download', procted, (req, res, next) => {
   // Pass workspaceId from query if needed for isolation check
   next();

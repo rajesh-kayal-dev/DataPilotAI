@@ -22,6 +22,10 @@ function initWorker() {
     maxRetriesPerRequest: null,
   });
 
+  connection.on('error', (error) => {
+    logger.error('BullMQ Worker Redis connection error:', { error: error.message });
+  });
+
   worker = new Worker('document-processing', async (job) => {
     const { documentId, userId } = job.data;
     
