@@ -89,6 +89,30 @@ export const handleChat = async (req, res) => {
       selectionMessage = "Please select a document to chat with:\n\n" + docs.map((d, i) => `${i + 1}. ${d.name}`).join('\n');
     }
 
+    // Check if the selected document(s) are still processing or failed
+    if (!needsSelection && targetDocumentIds.length > 0 && !req.documentSelected) {
+      const targetDocs = await Document.find({ _id: { $in: targetDocumentIds } });
+      const processingDoc = targetDocs.find(d => d.status === 'processing');
+      const failedDoc = targetDocs.find(d => d.status === 'failed');
+
+      if (processingDoc || failedDoc) {
+        const statusMsg = processingDoc 
+          ? `The document **${processingDoc.name}** is still processing. Please wait a few seconds and try again.` 
+          : `The document **${failedDoc.name}** failed to index. Please delete it and re-upload.`;
+        
+        if (stream) {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+          res.write(`data: ${JSON.stringify({ chunk: statusMsg })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          return res.end();
+        } else {
+          return res.json({ success: true, answer: statusMsg, model: 'system', source: 'System' });
+        }
+      }
+    }
+
     const history = await getSessionHistory(chatId, userId, workspaceId);
 
     if (stream) {
