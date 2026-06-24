@@ -10,8 +10,9 @@ import { checkS3Connection } from './services/s3Service.js';
 import { logger } from './utils/logger.js';
 import './workers/documentWorker.js'; // Start background worker
 
-// Set DNS servers for SRV records resolution in development / some networks
-dns.setServers(['8.8.8.8']);
+if (process.env.NODE_ENV === 'production') {
+  dns.setServers(['8.8.8.8']);
+}
 
 const PORT = process.env.PORT || 5000;
 
