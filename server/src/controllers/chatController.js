@@ -29,48 +29,58 @@ export const handleChat = async (req, res) => {
     let needsSelection = false;
     let selectionMessage = '';
 
-    if (chatSession && chatSession.activeDocumentId) {
+    const queryLower = question.toLowerCase();
+
+    // 1. Check if user explicitly mentioned a document name to switch
+    const matchedDoc = docs.find(d => {
+       const nameLower = d.name.toLowerCase();
+       return queryLower.includes(nameLower) || queryLower.includes(nameLower.split('.')[0]);
+    });
+
+    if (matchedDoc) {
+       targetDocumentIds = [matchedDoc._id.toString()];
+       activeDocumentIdToSave = matchedDoc._id;
+       // If it is a different document than current, confirm switch
+       if (chatSession && chatSession.activeDocumentId && chatSession.activeDocumentId.toString() !== matchedDoc._id.toString()) {
+         req.documentSelected = matchedDoc.name;
+       }
+    } 
+    // 2. Check if user explicitly asks to clear selection or search all documents
+    else if (queryLower.includes('all documents') || queryLower.includes('search all') || queryLower.includes('clear selection') || queryLower.includes('reset document')) {
+       targetDocumentIds = docs.map(d => d._id.toString());
+       activeDocumentIdToSave = null;
+       req.documentSelected = 'all documents in the workspace';
+    }
+    // 3. Fallback to session active document
+    else if (chatSession && chatSession.activeDocumentId) {
       targetDocumentIds = [chatSession.activeDocumentId.toString()];
       activeDocumentIdToSave = chatSession.activeDocumentId;
-    } else {
+    } 
+    // 4. Default: automatic selection logic
+    else {
       if (docs.length === 0) {
         targetDocumentIds = [];
       } else if (docs.length === 1) {
         targetDocumentIds = [docs[0]._id.toString()];
         activeDocumentIdToSave = docs[0]._id;
       } else {
-        const queryLower = question.toLowerCase();
-        
-        // Match explicit reference like "this document", "my resume", "that pdf"
         const explicitRef = ['this document', 'my resume', 'that pdf'].some(ref => queryLower.includes(ref));
-        
-        const matchedDoc = docs.find(d => {
-           const nameLower = d.name.toLowerCase();
-           return queryLower.includes(nameLower) || queryLower.includes(nameLower.split('.')[0]);
-        });
 
-        if (matchedDoc) {
-           targetDocumentIds = [matchedDoc._id.toString()];
-           activeDocumentIdToSave = matchedDoc._id;
-        } else {
-           const isNumber = /^\s*\d+\s*$/.test(question);
-           if (isNumber) {
-              const index = parseInt(question.trim(), 10) - 1;
-              if (index >= 0 && index < docs.length) {
-                 targetDocumentIds = [docs[index]._id.toString()];
-                 activeDocumentIdToSave = docs[index]._id;
-                 needsSelection = false;
-                 // Set a special flag to bypass LLM and just return a confirmation
-                 req.documentSelected = docs[index].name;
-              } else {
-                 needsSelection = true;
-              }
-           } else if (!explicitRef) {
-              needsSelection = true;
+        const isNumber = /^\s*\d+\s*$/.test(question);
+        if (isNumber) {
+           const index = parseInt(question.trim(), 10) - 1;
+           if (index >= 0 && index < docs.length) {
+              targetDocumentIds = [docs[index]._id.toString()];
+              activeDocumentIdToSave = docs[index]._id;
+              needsSelection = false;
+              req.documentSelected = docs[index].name;
            } else {
-              // They said "this document" but didn't specify which and no active document is set
               needsSelection = true;
            }
+        } else if (!explicitRef) {
+           needsSelection = true;
+        } else {
+           needsSelection = true;
         }
       }
     }
